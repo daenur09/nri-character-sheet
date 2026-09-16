@@ -1,9 +1,26 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Character, Hindrance } from '../models/character';
 import { HINDRANCES } from '../data/hindrances';
+import type { CustomHindrance } from '../types/custom-content';
+import { useCustomContent } from '../hooks/useCustomContent';
 import { addHindrance, removeHindrance } from '../mechanics/advancement';
 import { checkRequirements, formatRequirements } from '../mechanics/requirements';
 import { SourceBadge } from './SourceBadge';
+
+/**
+ * Преобразует кастомный изъян в форму, совместимую с HINDRANCES.
+ */
+function customToHindrance(c: CustomHindrance): typeof HINDRANCES[number] {
+  return {
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    severity: c.severity,
+    effects: c.effects,
+    requirements: c.requirements,
+    sourceId: 'custom',
+  };
+}
 
 interface Props {
   character: Character;
@@ -12,6 +29,7 @@ interface Props {
 
 /**
  * Панель изъянов (Hindrances) персонажа.
+ * Включает как стандартные изъяны из HINDRANCES, так и пользовательские.
  */
 export function HindrancesPanel({ character, onChange }: Props) {
   const [isAdding, setIsAdding] = useState(false);
@@ -20,8 +38,16 @@ export function HindrancesPanel({ character, onChange }: Props) {
     typeof HINDRANCES[number] | null
   >(null);
 
+  const { customHindrances } = useCustomContent();
+
+  // Объединяем стандартные и кастомные изъяны.
+  const allHindrances = useMemo(() => {
+    const customAsHindrances = (customHindrances ?? []).map(customToHindrance);
+    return [...HINDRANCES, ...customAsHindrances];
+  }, [customHindrances]);
+
   const owned = new Set(character.hindrances.map((h) => h.id));
-  const availableHindrances = HINDRANCES.filter((h) => !owned.has(h.id));
+  const availableHindrances = allHindrances.filter((h) => !owned.has(h.id));
 
   /**
    * Шаг 1: пользователь выбирает изъян и нажимает «Добавить» —
@@ -29,7 +55,7 @@ export function HindrancesPanel({ character, onChange }: Props) {
    */
   function handleAdd() {
     if (!selectedHindranceId) return;
-    const hindrance = HINDRANCES.find((h) => h.id === selectedHindranceId);
+    const hindrance = allHindrances.find((h) => h.id === selectedHindranceId);
     if (!hindrance) return;
     setPendingHindrance(hindrance);
   }
@@ -109,11 +135,15 @@ export function HindrancesPanel({ character, onChange }: Props) {
               style={{ flex: 1 }}
             >
               <option value="">— выберите изъян —</option>
-              {availableHindrances.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.name} ({h.severity === 'major' ? 'крупный' : 'мелкий'})
-                </option>
-              ))}
+              {availableHindrances.map((h) => {
+                const isCustom = h.sourceId === 'custom';
+                return (
+                  <option key={h.id} value={h.id}>
+                    {h.name} ({h.severity === 'major' ? 'крупный' : 'мелкий'})
+                    {isCustom ? ' [CUSTOM]' : ''}
+                  </option>
+                );
+              })}
             </select>
             <button
               onClick={handleAdd}
@@ -283,6 +313,7 @@ function ConfirmHindranceDialog({
           >
             {hindrance.severity === 'major' ? 'крупный' : 'мелкий'}
           </span>
+          <SourceBadge sourceId={hindrance.sourceId} small />
         </div>
 
         {hindrance.description && (
