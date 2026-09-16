@@ -1,10 +1,26 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Character, Edge } from '../models/character';
 import { EDGES } from '../data/edges';
+import type { CustomEdge } from '../types/custom-content';
+import { useCustomContent } from '../hooks/useCustomContent';
 import { removeEdge } from '../mechanics/advancement';
 import { Plus, X } from 'lucide-react';
 import { SourceBadge } from './SourceBadge';
 import { checkRequirements, formatRequirements } from '../mechanics/requirements';
+
+/**
+ * Преобразует кастомную черту в форму, совместимую с EDGES.
+ */
+function customToEdge(c: CustomEdge): typeof EDGES[number] {
+  return {
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    sourceId: 'custom',
+    requirements: c.requirements,
+    effects: c.effects,
+  };
+}
 
 interface Props {
   character: Character;
@@ -13,18 +29,27 @@ interface Props {
 
 /**
  * Панель черт (Edges) персонажа.
+ * Включает как стандартные черты из EDGES, так и пользовательские.
  */
 export function EdgesPanel({ character, onChange }: Props) {
   const [isAdding, setIsAdding] = useState(false);
   const [selectedEdgeId, setSelectedEdgeId] = useState('');
   const [pendingEdge, setPendingEdge] = useState<typeof EDGES[number] | null>(null);
 
+  const { customEdges } = useCustomContent();
+
+  // Объединяем стандартные и кастомные черты.
+  const allEdges = useMemo(() => {
+    const customAsEdges = (customEdges ?? []).map(customToEdge);
+    return [...EDGES, ...customAsEdges];
+  }, [customEdges]);
+
   const owned = new Set(character.edges.map((e) => e.id));
-  const availableEdges = EDGES.filter((e) => !owned.has(e.id));
+  const availableEdges = allEdges.filter((e) => !owned.has(e.id));
 
   function handleAdd() {
     if (!selectedEdgeId) return;
-    const edge = EDGES.find((e) => e.id === selectedEdgeId);
+    const edge = allEdges.find((e) => e.id === selectedEdgeId);
     if (!edge) return;
 
     // Показываем диалог подтверждения — это «ручной режим» ведущего.
@@ -99,11 +124,14 @@ export function EdgesPanel({ character, onChange }: Props) {
             style={{ flex: 1 }}
           >
             <option value="">— выберите черту —</option>
-            {availableEdges.map((edge) => (
-              <option key={edge.id} value={edge.id}>
-                {edge.name}
-              </option>
-            ))}
+            {availableEdges.map((edge) => {
+              const isCustom = edge.sourceId === 'custom';
+              return (
+                <option key={edge.id} value={edge.id}>
+                  {edge.name}{isCustom ? ' [CUSTOM]' : ''}
+                </option>
+              );
+            })}
           </select>
           <button
             onClick={handleAdd}
@@ -171,7 +199,8 @@ export function EdgesPanel({ character, onChange }: Props) {
           ))}
         </div>
       )}
-            {pendingEdge && (
+
+      {pendingEdge && (
         <ConfirmDialog
           edge={pendingEdge}
           character={character}
@@ -182,7 +211,6 @@ export function EdgesPanel({ character, onChange }: Props) {
     </div>
   );
 }
-
 
 /**
  * Диалог подтверждения добавления черты.
@@ -235,8 +263,17 @@ function ConfirmDialog({
           Добавить черту?
         </h3>
 
-        <div style={{ marginBottom: '12px' }}>
+        <div
+          style={{
+            marginBottom: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            flexWrap: 'wrap',
+          }}
+        >
           <strong>{edge.name}</strong>
+          <SourceBadge sourceId={edge.sourceId} small />
         </div>
 
         {edge.description && (
