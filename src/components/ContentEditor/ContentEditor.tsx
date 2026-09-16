@@ -1,18 +1,44 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, Sparkles, Star, BookMarked, Zap, Bug } from 'lucide-react';
-import type { CustomEdge, CustomMonster } from '../../types/custom-content';
+import type {
+  CustomEdge,
+  CustomHindrance,
+  CustomSkill,
+  CustomPower,
+  CustomMonster,
+} from '../../types/custom-content';
 import { useCustomContent } from '../../hooks/useCustomContent';
-import { deleteCustomEdge, deleteCustomMonster } from '../../db/customContent';
+import {
+  deleteCustomEdge,
+  deleteCustomHindrance,
+  deleteCustomSkill,
+  deleteCustomPower,
+  deleteCustomMonster,
+} from '../../db/customContent';
 import { EdgeForm } from './EdgeForm';
+import { HindranceForm } from './HindranceForm';
+import { SkillForm } from './SkillForm';
+import { PowerForm } from './PowerForm';
 import { MonsterForm } from './MonsterForm';
 import { SourceBadge } from '../SourceBadge';
 
 type ContentType = 'edge' | 'hindrance' | 'skill' | 'power' | 'monster';
 
+const CREATE_LABELS: Record<ContentType, string> = {
+  edge: 'Новая черта',
+  hindrance: 'Новый изъян',
+  skill: 'Новый навык',
+  power: 'Новая сила',
+  monster: 'Новый монстр',
+};
+
 export function ContentEditor() {
   const [activeType, setActiveType] = useState<ContentType>('edge');
   const [isCreating, setIsCreating] = useState(false);
   const [editingEdge, setEditingEdge] = useState<CustomEdge | null>(null);
+  const [editingHindrance, setEditingHindrance] = useState<CustomHindrance | null>(null);
+  const [editingSkill, setEditingSkill] = useState<CustomSkill | null>(null);
+  const [editingPower, setEditingPower] = useState<CustomPower | null>(null);
   const [editingMonster, setEditingMonster] = useState<CustomMonster | null>(null);
 
   const {
@@ -24,28 +50,52 @@ export function ContentEditor() {
     reload,
   } = useCustomContent();
 
-  // Защита от undefined (на случай, если хук вернул не всё).
   const edges = customEdges ?? [];
   const hindrances = customHindrances ?? [];
   const skills = customSkills ?? [];
   const powers = customPowers ?? [];
   const monsters = customMonsters ?? [];
 
+  const isEditingAnything =
+    isCreating ||
+    !!editingEdge ||
+    !!editingHindrance ||
+    !!editingSkill ||
+    !!editingPower ||
+    !!editingMonster;
+
   function resetState() {
     setIsCreating(false);
     setEditingEdge(null);
+    setEditingHindrance(null);
+    setEditingSkill(null);
+    setEditingPower(null);
     setEditingMonster(null);
   }
 
-  async function handleDeleteEdge(edge: CustomEdge) {
-    if (!confirm(`Удалить черту «${edge.name}»?`)) return;
-    await deleteCustomEdge(edge.id);
+  async function handleDeleteEdge(e: CustomEdge) {
+    if (!confirm(`Удалить черту «${e.name}»?`)) return;
+    await deleteCustomEdge(e.id);
     await reload();
   }
-
-  async function handleDeleteMonster(monster: CustomMonster) {
-    if (!confirm(`Удалить монстра «${monster.name}»?`)) return;
-    await deleteCustomMonster(monster.id);
+  async function handleDeleteHindrance(h: CustomHindrance) {
+    if (!confirm(`Удалить изъян «${h.name}»?`)) return;
+    await deleteCustomHindrance(h.id);
+    await reload();
+  }
+  async function handleDeleteSkill(s: CustomSkill) {
+    if (!confirm(`Удалить навык «${s.name}»?`)) return;
+    await deleteCustomSkill(s.id);
+    await reload();
+  }
+  async function handleDeletePower(p: CustomPower) {
+    if (!confirm(`Удалить силу «${p.name}»?`)) return;
+    await deleteCustomPower(p.id);
+    await reload();
+  }
+  async function handleDeleteMonster(m: CustomMonster) {
+    if (!confirm(`Удалить монстра «${m.name}»?`)) return;
+    await deleteCustomMonster(m.id);
     await reload();
   }
 
@@ -99,30 +149,15 @@ export function ContentEditor() {
         />
 
         <div style={{ marginLeft: 'auto' }}>
-          {!isCreating && !editingEdge && !editingMonster && activeType === 'edge' && (
+          {!isEditingAnything && (
             <button
               onClick={() => setIsCreating(true)}
               className="btn btn-primary"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
               <Plus size={14} />
-              <span>Новая черта</span>
+              <span>{CREATE_LABELS[activeType]}</span>
             </button>
-          )}
-          {!isCreating && !editingEdge && !editingMonster && activeType === 'monster' && (
-            <button
-              onClick={() => setIsCreating(true)}
-              className="btn btn-primary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-            >
-              <Plus size={14} />
-              <span>Новый монстр</span>
-            </button>
-          )}
-          {!isCreating && !editingEdge && !editingMonster && (activeType === 'hindrance' || activeType === 'skill' || activeType === 'power') && (
-            <div className="tiny" style={{ alignSelf: 'center' }}>
-              Формы для этого типа — в следующем шаге
-            </div>
           )}
         </div>
       </div>
@@ -137,45 +172,84 @@ export function ContentEditor() {
               onCancel={resetState}
             />
           )}
-
           {!isCreating && !editingEdge && (
-            <div>
-              {edges.length === 0 ? (
-                <div className="panel" style={{ padding: '32px', textAlign: 'center' }}>
-                  <p className="muted">Пока не создано ни одной кастомной черты.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {edges.map((edge) => (
-                    <div
-                      key={edge.id}
-                      className="panel"
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                          <strong>{edge.name}</strong>
-                          <SourceBadge sourceId="custom" small />
-                        </div>
-                        {edge.description && (
-                          <div className="tiny" style={{ marginBottom: '4px' }}>
-                            {edge.description}
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button onClick={() => setEditingEdge(edge)} className="btn" style={{ padding: '6px 10px' }}>
-                          <Pencil size={14} />
-                        </button>
-                        <button onClick={() => handleDeleteEdge(edge)} className="btn btn-danger" style={{ padding: '6px 10px' }}>
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SimpleList
+              items={edges}
+              emptyText="Пока не создано ни одной кастомной черты."
+              onEdit={setEditingEdge}
+              onDelete={handleDeleteEdge}
+              renderMeta={(e) => e.description}
+            />
+          )}
+        </>
+      )}
+
+      {/* --- Изъяны --- */}
+      {activeType === 'hindrance' && (
+        <>
+          {(isCreating || editingHindrance) && (
+            <HindranceForm
+              editing={editingHindrance}
+              onSaved={async () => { resetState(); await reload(); }}
+              onCancel={resetState}
+            />
+          )}
+          {!isCreating && !editingHindrance && (
+            <SimpleList
+              items={hindrances}
+              emptyText="Пока не создано ни одного изъяна."
+              onEdit={setEditingHindrance}
+              onDelete={handleDeleteHindrance}
+              renderMeta={(h) =>
+  `${h.severity === 'major' ? 'Крупный' : 'Мелкий'}${
+    h.description ? ' · ' + h.description : ''
+  }`
+}
+            />
+          )}
+        </>
+      )}
+
+      {/* --- Навыки --- */}
+      {activeType === 'skill' && (
+        <>
+          {(isCreating || editingSkill) && (
+            <SkillForm
+              editing={editingSkill}
+              onSaved={async () => { resetState(); await reload(); }}
+              onCancel={resetState}
+            />
+          )}
+          {!isCreating && !editingSkill && (
+            <SimpleList
+              items={skills}
+              emptyText="Пока не создано ни одного навыка."
+              onEdit={setEditingSkill}
+              onDelete={handleDeleteSkill}
+              renderMeta={(s) => `${s.attribute}${s.isCore ? ' · базовый' : ''}`}
+            />
+          )}
+        </>
+      )}
+
+      {/* --- Силы --- */}
+      {activeType === 'power' && (
+        <>
+          {(isCreating || editingPower) && (
+            <PowerForm
+              editing={editingPower}
+              onSaved={async () => { resetState(); await reload(); }}
+              onCancel={resetState}
+            />
+          )}
+          {!isCreating && !editingPower && (
+            <SimpleList
+              items={powers}
+              emptyText="Пока не создано ни одной силы."
+              onEdit={setEditingPower}
+              onDelete={handleDeletePower}
+              renderMeta={(p) => `${p.rank} · ${p.cost} ОД · ${p.range} · ${p.duration}`}
+            />
           )}
         </>
       )}
@@ -190,63 +264,93 @@ export function ContentEditor() {
               onCancel={resetState}
             />
           )}
-
           {!isCreating && !editingMonster && (
-            <div>
-              {monsters.length === 0 ? (
-                <div className="panel" style={{ padding: '32px', textAlign: 'center' }}>
-                  <p className="muted">Пока не создано ни одного монстра.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {monsters.map((m) => (
-                    <div
-                      key={m.id}
-                      className="panel"
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                          <strong>{m.name}</strong>
-                          <SourceBadge sourceId="custom" small />
-                          {m.isWildCard && (
-                            <span className="tiny" style={{ color: 'var(--accent)', fontWeight: 'bold', fontSize: '10px' }}>
-                              ДИКАЯ КАРТА
-                            </span>
-                          )}
-                        </div>
-                        <div className="tiny" style={{ marginBottom: '4px' }}>
-                          {m.category} · {m.role} · {m.rank}
-                        </div>
-                        {m.description && (
-                          <div className="tiny">{m.description}</div>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button onClick={() => setEditingMonster(m)} className="btn" style={{ padding: '6px 10px' }}>
-                          <Pencil size={14} />
-                        </button>
-                        <button onClick={() => handleDeleteMonster(m)} className="btn btn-danger" style={{ padding: '6px 10px' }}>
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SimpleList
+              items={monsters}
+              emptyText="Пока не создано ни одного монстра."
+              onEdit={setEditingMonster}
+              onDelete={handleDeleteMonster}
+              renderMeta={(m) =>
+                `${m.category} · ${m.role} · ${m.rank}${m.isWildCard ? ' · ДИКАЯ КАРТА' : ''}`
+              }
+            />
           )}
         </>
       )}
+    </div>
+  );
+}
 
-      {/* --- Заглушки --- */}
-      {(activeType === 'hindrance' || activeType === 'skill' || activeType === 'power') && (
-        <div className="panel" style={{ padding: '32px', textAlign: 'center' }}>
-          <p className="muted">
-            Форма для этого типа появится в следующем шаге.
-          </p>
+/**
+ * Универсальный список элементов с бейджем CUSTOM и кнопками edit/delete.
+ */
+function SimpleList<T extends { id: string; name: string }>({
+  items,
+  emptyText,
+  onEdit,
+  onDelete,
+  renderMeta,
+}: {
+  items: T[];
+  emptyText: string;
+  onEdit: (item: T) => void;
+  onDelete: (item: T) => void;
+  renderMeta?: (item: T) => string;
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="panel" style={{ padding: '32px', textAlign: 'center' }}>
+        <p className="muted">{emptyText}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {items.map((item) => (
+        <div
+          key={item.id}
+          className="panel"
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '12px',
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                flexWrap: 'wrap',
+                marginBottom: '4px',
+              }}
+            >
+              <strong>{item.name}</strong>
+              <SourceBadge sourceId="custom" small />
+            </div>
+            {renderMeta && (
+              <div className="tiny" style={{ marginBottom: '4px' }}>
+                {renderMeta(item)}
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button onClick={() => onEdit(item)} className="btn" style={{ padding: '6px 10px' }}>
+              <Pencil size={14} />
+            </button>
+            <button
+              onClick={() => onDelete(item)}
+              className="btn btn-danger"
+              style={{ padding: '6px 10px' }}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }
