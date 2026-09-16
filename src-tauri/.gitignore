@@ -1,0 +1,29 @@
+# Зависимости
+node_modules/
+
+# Сборка Vite
+dist/
+
+# Сборка Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# Логи
+*.log
+npm-debug.log*
+
+# Редактор
+.vscode/
+.idea/
+
+# Секреты (если появятся)
+.env
+.env.local
+
+# Кэш
+.cache/
+.vite/

@@ -1,0 +1,106 @@
+import type { EdgeEffects } from './edges';
+import type { Requirements } from '../types/requirements';
+
+export type HindranceSeverity = 'minor' | 'major';
+
+export interface Hindrance {
+  id: string;
+  name: string;
+  description: string;
+  severity: HindranceSeverity;
+  effects: EdgeEffects;
+  /** Требования (для кастомных изъянов — например, «только для персонажей ранга X»). */
+  requirements?: Requirements;
+  sourceId: string;
+}
+export const HINDRANCES: Hindrance[] = [
+  // ==== Мелкие ====
+  { id: 'bad_eyes', name: 'Плохое зрение', description: '−2 к проверкам, требующим зрения.', severity: 'minor',
+    effects: { skillBonus: { 'Стрельба': -2, 'Метание': -2, 'Внимание': -2 } }, sourceId: 'core' },
+  { id: 'hard_of_hearing', name: 'Тугой на ухо', description: '−2 к вниманию на слух.', severity: 'minor',
+    effects: { skillBonus: { 'Внимание': -2 } }, sourceId: 'core' },
+  { id: 'obese', name: 'Толстяк', description: 'Стойкость +1, Шаг −1.', severity: 'minor',
+    effects: { toughnessBonus: 1, paceBonus: -1 }, sourceId: 'core' },
+  { id: 'ugly', name: 'Уродство', description: 'Харизма −2.', severity: 'minor',
+    effects: { charismaBonus: -2 }, sourceId: 'core' },
+  { id: 'mean', name: 'Дурной характер', description: 'Харизма −2.', severity: 'minor',
+    effects: { charismaBonus: -2 }, sourceId: 'core' },
+  { id: 'habit', name: 'Дурная привычка', description: 'Мелкая привычка. Харизма −1.', severity: 'minor',
+    effects: { charismaBonus: -1 }, sourceId: 'core' },
+  { id: 'quirk', name: 'Причуда', description: 'Странная привычка.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'stubborn', name: 'Упрямство', description: 'Всегда делает по-своему.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'yellow', name: 'Трусость', description: '−2 к храбрости.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'pacifist_minor', name: 'Пацифизм (мелкий)', description: 'Не дерётся, если есть выбор.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'death_wish', name: 'Последнее желание', description: 'Умрёт только после цели.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'vow', name: 'Клятва', description: 'Связан обещанием.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'wanted', name: 'В розыске', description: 'Разыскивается за преступление.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'enemy', name: 'Враг', description: 'Кто-то ненавидит персонажа.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'delusional', name: 'Заблуждение', description: 'Верит в странные вещи.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'greedy', name: 'Жадность', description: 'Очень охоч до сокровищ.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'big_mouth', name: 'Длинный язык', description: 'Не хранит секретов.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'illiterate', name: 'Неграмотность', description: 'Не умеет читать и писать.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'thin_skinned', name: 'Тонкокожий', description: '−2 к защите в поединке воли.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'phobia', name: 'Фобия', description: 'Иррациональный страх.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'outsider', name: 'Чужак', description: '−2 к харизме с местными.', severity: 'minor',
+    effects: { charismaBonus: -2 }, sourceId: 'core' },
+  { id: 'anemic', name: 'Малокровие', description: '−2 против усталости и болезней.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+  { id: 'all_thumbs', name: 'Кривые руки', description: '−2 к ремонту.', severity: 'minor',
+    effects: { skillBonus: { 'Ремонт': -2 } }, sourceId: 'core' },
+  { id: 'doubting_thomas', name: 'Фома неверующий', description: '−2 к храбрости против сверхъестественного.', severity: 'minor',
+    effects: {}, sourceId: 'core' },
+
+  // ==== Крупные ====
+  { id: 'bad_eyes_major', name: 'Плохое зрение (крупный)', description: '−2 к зрению, очки могут слететь.', severity: 'major',
+    effects: { skillBonus: { 'Стрельба': -2, 'Метание': -2, 'Внимание': -2 } }, sourceId: 'core' },
+  { id: 'hard_of_hearing_major', name: 'Тугой на ухо (крупный)', description: 'Полностью глухой.', severity: 'major',
+    effects: { skillBonus: { 'Внимание': -2 } }, sourceId: 'core' },
+  { id: 'slow', name: 'Медлительность', description: 'Тянет две карты действия, худшая.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+  { id: 'elderly', name: 'Старость', description: 'Шаг −1, Сила и Выносливость −1 ступень.', severity: 'major',
+    effects: { paceBonus: -1, attributeBonus: { strength: -2, vigor: -2 } }, sourceId: 'core' },
+  { id: 'young', name: 'Юность', description: 'Меньше очков, но +1 фишка.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+  { id: 'one_eye', name: 'Одноглазый', description: '−2 к глазомеру, −1 к харизме.', severity: 'major',
+    effects: { charismaBonus: -1, skillBonus: { 'Стрельба': -2, 'Метание': -2 } }, sourceId: 'core' },
+  { id: 'one_arm', name: 'Однорукий', description: '−4 к действиям двумя руками.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+  { id: 'lame', name: 'Хромота', description: 'Шаг −2.', severity: 'major',
+    effects: { paceBonus: -2 }, sourceId: 'core' },
+  { id: 'blind', name: 'Слепота', description: '−6 на действия со зрением.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+  { id: 'pacifist_major', name: 'Пацифизм (крупный)', description: 'Не причиняет вреда живому.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+  { id: 'code_of_honor', name: 'Кодекс чести', description: 'Держит слово, не убивает пленников.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+  { id: 'bloodthirsty', name: 'Жажда крови', description: 'Не берёт пленных. −4 к харизме.', severity: 'major',
+    effects: { charismaBonus: -4 }, sourceId: 'core' },
+  { id: 'curious', name: 'Любопытство', description: 'Легко втянуть в авантюру.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+  { id: 'arrogant', name: 'Заносчивость', description: 'Считает себя лучше всех.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+  { id: 'overconfident', name: 'Самоуверенность', description: 'Справится с любым противником.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+  { id: 'clueless', name: 'Невежда', description: '−2 к общедоступным знаниям.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+  { id: 'bad_luck', name: 'Неудачник', description: 'На 1 фишку меньше.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+  { id: 'mute', name: 'Немота', description: 'Не может говорить.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+  { id: 'illiterate_major', name: 'Неграмотность (крупная)', description: 'Полностью неграмотен.', severity: 'major',
+    effects: {}, sourceId: 'core' },
+];
