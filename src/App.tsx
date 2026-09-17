@@ -15,6 +15,7 @@ import { AdvancementDialog } from './components/AdvancementDialog';
 import { EdgesPanel } from './components/EdgesPanel';
 import { HindrancesPanel } from './components/HindrancesPanel';
 import { SkillsPanel } from './components/SkillsPanel';
+import { AttributesPanel } from './components/AttributesPanel';
 import { FieldEditor } from './components/FieldEditor/FieldEditor';
 import { SheetView } from './components/SheetView/SheetView';
 import { RuleBook } from './components/RuleBook/RuleBook';
@@ -41,10 +42,19 @@ const ATTRIBUTE_LABELS: Record<AttributeName, string> = {
 type Tab = 'sheet' | 'editor' | 'rules' | 'bestiary' | 'gm' | 'content';
 type SheetMode = 'form' | 'image';
 
+/**
+ * Источник последнего броска — навык или атрибут.
+ * Нужен для корректного переброса за фишку: для атрибута
+ * повторно применяется штраф −2, для навыка — его модификатор.
+ */
+type RollSource =
+  | { kind: 'skill'; name: string }
+  | { kind: 'attribute'; name: AttributeName };
+
 export function App() {
   const [character, setCharacter] = useState<Character | null>(null);
   const [lastRoll, setLastRoll] = useState<SkillRollResult | null>(null);
-  const [lastSkillName, setLastSkillName] = useState<string | null>(null);
+  const [lastRollSource, setLastRollSource] = useState<RollSource | null>(null);
   const [rerolledFor, setRerolledFor] = useState<number | null>(null);
   const [rollCounter, setRollCounter] = useState(0);
   const [hasRolled, setHasRolled] = useState(false);
@@ -102,7 +112,6 @@ export function App() {
     }
   }, [fieldMap]);
 
-  /** Перечитать активного персонажа из базы. */
   async function reloadActiveCharacter() {
     if (character) {
       const fresh = await db.characters.get(character.id);
@@ -120,7 +129,6 @@ export function App() {
     }
   }
 
-  /** Переключить активного персонажа. */
   async function setActiveCharacter(id: string) {
     const target = await db.characters.get(id);
     if (target) {
@@ -130,11 +138,10 @@ export function App() {
     }
   }
 
-  /** Сбросить состояние броска — новое действие. */
   function nextTurn() {
     setHasRolled(false);
     setLastRoll(null);
-    setLastSkillName(null);
+    setLastRollSource(null);
     setRerolledFor(null);
   }
 
@@ -293,8 +300,8 @@ export function App() {
         fieldMap={fieldMap}
         setFieldMap={setFieldMap}
         lastRoll={lastRoll}
-        lastSkillName={lastSkillName}
-        setLastSkillName={setLastSkillName}
+        lastRollSource={lastRollSource}
+        setLastRollSource={setLastRollSource}
         hasRolled={hasRolled}
         onRoll={(r) => {
           setLastRoll(r);
@@ -334,8 +341,8 @@ function SheetForm({
   fieldMap,
   setFieldMap,
   lastRoll,
-  lastSkillName,
-  setLastSkillName,
+  lastRollSource,
+  setLastRollSource,
   hasRolled,
   onRoll,
   onNextTurn,
@@ -353,8 +360,8 @@ function SheetForm({
   fieldMap: FieldMap | null;
   setFieldMap: (map: FieldMap | null) => void;
   lastRoll: SkillRollResult | null;
-  lastSkillName: string | null;
-  setLastSkillName: (v: string | null) => void;
+  lastRollSource: RollSource | null;
+  setLastRollSource: (v: RollSource | null) => void;
   hasRolled: boolean;
   onRoll: (r: SkillRollResult) => void;
   onNextTurn: () => void;
@@ -372,12 +379,6 @@ function SheetForm({
   const available = calculateAvailableAdvancements(character.profile.xp);
   const remaining = calculateRemainingAdvancements(character);
   const totalPenalty = character.wounds + character.fatigue;
-
-  function setAttribute(attr: AttributeName, die: DieType) {
-    setCharacter((c) =>
-      c ? { ...c, attributes: { ...c.attributes, [attr]: die } } : c
-    );
-  }
 
   function changeXp(delta: number) {
     setCharacter((c) =>
@@ -407,6 +408,7 @@ function SheetForm({
     setCharacter((c) => (c ? { ...c, bennies: Math.max(0, value) } : c));
   }
 
+  /** Бросок навыка (обычный). */
   function handleRollSkill(skillName: string) {
     if (hasRolled) return;
     const skill = character.skills.find((s) => s.name === skillName);
@@ -417,26 +419,53 @@ function SheetForm({
       skill.modifier - penalty,
       character.isWildCard
     );
-    setLastSkillName(skillName);
+    setLastRollSource({ kind: 'skill', name: skillName });
+    onRoll(result);
+  }
+
+  /**
+   * Бросок атрибута со штрафом −2 (правило SWADE, когда нет нужного навыка).
+   * Дополнительно вычитаются ранения и усталость.
+   */
+  function handleRollAttribute(attr: AttributeName) {
+    if (hasRolled) return;
+    const penalty = character.wounds + character.fatigue;
+    const result = rollSkill(
+      character.attributes[attr],
+      -2 - penalty,
+      character.isWildCard
+    );
+    setLastRollSource({ kind: 'attribute', name: attr });
     onRoll(result);
   }
 
   function handleReroll() {
-    if (!lastRoll || !lastSkillName) return;
+    if (!lastRoll || !lastRollSource) return;
     if (character.bennies <= 0) return;
     if (lastRoll.hasAce) return;
     if (lastRoll.isCriticalFailure) return;
     if (rerolledFor === rollCounter) return;
 
-    const skill = character.skills.find((s) => s.name === lastSkillName);
-    if (!skill) return;
+    let die: DieType;
+    let baseModifier: number;
+
+    if (lastRollSource.kind === 'skill') {
+      const skill = character.skills.find((s) => s.name === lastRollSource.name);
+      if (!skill) return;
+      die = skill.die;
+      baseModifier = skill.modifier;
+    } else {
+      die = character.attributes[lastRollSource.name];
+      // Штраф −2 за отсутствие навыка сохраняется при перебросе
+      baseModifier = -2;
+    }
 
     onSpendBenny();
 
     const penalty = character.wounds + character.fatigue;
     const newResult = rollSkill(
-      skill.die,
-      skill.modifier - penalty,
+      die,
+      baseModifier - penalty,
       character.isWildCard
     );
 
@@ -610,45 +639,12 @@ function SheetForm({
 
       {/* --- Атрибуты --- */}
       <h2>Характеристики</h2>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: '12px',
-          marginBottom: '24px',
-        }}
-      >
-        {(Object.keys(character.attributes) as AttributeName[]).map((attr) => (
-          <div
-            key={attr}
-            className="stat-box"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              textAlign: 'center',
-            }}
-          >
-            <span className="stat-label" style={{ marginBottom: '8px' }}>
-              {ATTRIBUTE_LABELS[attr]}
-            </span>
-            <select
-              value={character.attributes[attr]}
-              onChange={(e) => setAttribute(attr, e.target.value as DieType)}
-              className="select"
-              style={{
-                fontSize: '16px',
-                fontWeight: 'bold',
-                textAlign: 'center',
-                padding: '6px',
-              }}
-            >
-              {DIE_OPTIONS.map((die) => (
-                <option key={die} value={die}>{die}</option>
-              ))}
-            </select>
-          </div>
-        ))}
-      </div>
+      <AttributesPanel
+        character={character}
+        onChange={(updated) => setCharacter(updated)}
+        hasRolled={hasRolled}
+        onRollAttribute={handleRollAttribute}
+      />
 
       {/* --- Производные --- */}
       <h2>Производные параметры</h2>
@@ -686,13 +682,15 @@ function SheetForm({
         <RollResultDisplay
           result={lastRoll}
           bennies={character.bennies}
-          canReroll={!!lastSkillName}
+          canReroll={!!lastRollSource}
           onReroll={handleReroll}
           alreadyRerolled={rerolledFor === rollCounter}
           onNextTurn={onNextTurn}
         />
       ) : (
-        <p className="muted">Нажмите «Бросить» у любого навыка.</p>
+        <p className="muted">
+          Нажмите «Бросить» у любого навыка или «Бросок −2» у атрибута.
+        </p>
       )}
 
       {/* --- Модальное окно повышения --- */}
