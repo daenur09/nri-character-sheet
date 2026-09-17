@@ -6,29 +6,26 @@ import {
   Heart,
   Zap,
   Coins,
-  Shield,
-  Activity,
   Download,
   Upload,
+  Users,
+  FileText,
 } from 'lucide-react';
 import type { Character } from '../../models/character';
 import { db, exportToJson, importFromJson } from '../../db/database';
 import { createNewCharacter } from '../../data/new-character';
 import { calculateDerivedStats } from '../../mechanics/derived';
 import { calculateRank } from '../../mechanics/advancement';
+import { NotesPanel } from './NotesPanel';
 
 interface Props {
-  /** id активного персонажа (того, который открыт на вкладке «Лист персонажа»). */
   activeCharacterId: string | null;
-  /** Колбэк для переключения активного персонажа. */
   onSetActive: (id: string) => void;
-  /** Колбэк после добавления/удаления — чтобы обновить общий список в App. */
   onRefresh: () => void;
 }
 
-/**
- * Экран ведущего: список всех персонажей партии.
- */
+type Mode = 'party' | 'notes';
+
 export function GameMasterScreen({
   activeCharacterId,
   onSetActive,
@@ -41,12 +38,11 @@ export function GameMasterScreen({
     text: string;
   } | null>(null);
   const [isBatchImporting, setIsBatchImporting] = useState(false);
+  const [mode, setMode] = useState<Mode>('party');
 
-  // --- Загружаем всех персонажей ---
   async function loadAll() {
     try {
       const all = await db.characters.toArray();
-      // Сортируем по имени
       all.sort((a, b) => a.profile.name.localeCompare(b.profile.name));
       setCharacters(all);
     } catch (err) {
@@ -60,7 +56,6 @@ export function GameMasterScreen({
     loadAll();
   }, []);
 
-  // --- Обновить поле у персонажа ---
   async function updateCharacter(
     id: string,
     updater: (c: Character) => Character
@@ -69,13 +64,10 @@ export function GameMasterScreen({
     if (!current) return;
     const updated = updater(current);
     await db.characters.put(updated);
-    setCharacters((list) =>
-      list.map((c) => (c.id === id ? updated : c))
-    );
+    setCharacters((list) => list.map((c) => (c.id === id ? updated : c)));
     onRefresh();
   }
 
-  // --- Изменение ран/усталости/фишки ---
   function changeWounds(id: string, delta: number) {
     updateCharacter(id, (c) => ({
       ...c,
@@ -97,7 +89,6 @@ export function GameMasterScreen({
     }));
   }
 
-  // --- Создать нового персонажа ---
   async function handleCreate() {
     const name = prompt('Имя нового персонажа:', 'Новый герой');
     if (!name || !name.trim()) return;
@@ -109,14 +100,8 @@ export function GameMasterScreen({
     setTimeout(() => setMessage(null), 3000);
   }
 
-  // --- Удалить персонажа ---
   async function handleDelete(id: string, name: string) {
-    if (
-      !confirm(
-        `Удалить персонажа «${name}»?\n\nЭто действие нельзя отменить.`
-      )
-    )
-      return;
+    if (!confirm(`Удалить персонажа «${name}»?\n\nЭто действие нельзя отменить.`)) return;
     await db.characters.delete(id);
     await loadAll();
     onRefresh();
@@ -124,24 +109,18 @@ export function GameMasterScreen({
     setTimeout(() => setMessage(null), 3000);
   }
 
-  // --- Экспорт партии ---
   function handleExportParty() {
     if (characters.length === 0) {
       setMessage({ type: 'error', text: 'Нет персонажей для экспорта.' });
       setTimeout(() => setMessage(null), 3000);
       return;
     }
-
     const bundle = {
       format: 'nri-character-sheet-party',
       version: 1,
       exportedAt: new Date().toISOString(),
-      characters: characters.map((c) => ({
-        character: c,
-        fieldMap: null, // Для партии карту разметки не экспортируем
-      })),
+      characters: characters.map((c) => ({ character: c, fieldMap: null })),
     };
-
     const blob = new Blob([JSON.stringify(bundle, null, 2)], {
       type: 'application/json',
     });
@@ -152,16 +131,13 @@ export function GameMasterScreen({
     a.download = `party_${date}.json`;
     a.click();
     URL.revokeObjectURL(url);
-
     setMessage({ type: 'ok', text: `Экспортировано персонажей: ${characters.length}.` });
     setTimeout(() => setMessage(null), 3000);
   }
 
-  // --- Импорт партии ---
   async function handleImportParty(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setIsBatchImporting(true);
     const reader = new FileReader();
 
@@ -169,28 +145,20 @@ export function GameMasterScreen({
       try {
         const text = reader.result as string;
         const parsed = JSON.parse(text);
-
-        // Поддерживаем два формата: экспорт партии и одиночный персонаж.
         let toImport: Character[] = [];
 
         if (parsed?.format === 'nri-character-sheet-party') {
-          // Партия
           for (const item of parsed.characters) {
             if (item?.character) toImport.push(item.character);
           }
         } else if (parsed?.format === 'nri-character-sheet') {
-          // Одиночный персонаж — пробуем через стандартный импорт.
           const { character } = importFromJson(text);
           toImport = [character];
         } else {
-          throw new Error(
-            'Файл не является экспортом персонажа или партии из этого приложения.'
-          );
+          throw new Error('Файл не является экспортом персонажа или партии.');
         }
 
-        if (toImport.length === 0) {
-          throw new Error('В файле нет персонажей.');
-        }
+        if (toImport.length === 0) throw new Error('В файле нет персонажей.');
 
         if (
           !confirm(
@@ -204,16 +172,10 @@ export function GameMasterScreen({
           return;
         }
 
-        for (const c of toImport) {
-          await db.characters.put(c);
-        }
-
+        for (const c of toImport) await db.characters.put(c);
         await loadAll();
         onRefresh();
-        setMessage({
-          type: 'ok',
-          text: `Импортировано персонажей: ${toImport.length}.`,
-        });
+        setMessage({ type: 'ok', text: `Импортировано персонажей: ${toImport.length}.` });
         setTimeout(() => setMessage(null), 3000);
       } catch (err) {
         console.error(err);
@@ -234,118 +196,142 @@ export function GameMasterScreen({
 
   return (
     <div style={{ padding: '8px' }}>
-      {/* --- Тулбар --- */}
+      {/* --- Переключатель Партия / Заметки --- */}
       <div
         className="panel"
         style={{
           display: 'flex',
           gap: '8px',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          marginBottom: '20px',
-          padding: '12px',
+          marginBottom: '16px',
+          padding: '8px',
         }}
       >
         <button
-          onClick={handleCreate}
-          className="btn btn-primary"
+          onClick={() => setMode('party')}
+          className={`btn ${mode === 'party' ? 'btn-primary' : ''}`}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          <UserPlus size={16} />
-          <span>Создать персонажа</span>
+          <Users size={14} />
+          <span>Партия</span>
         </button>
-
         <button
-          onClick={handleExportParty}
-          className="btn"
+          onClick={() => setMode('notes')}
+          className={`btn ${mode === 'notes' ? 'btn-primary' : ''}`}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          <Download size={16} />
-          <span>Экспорт партии</span>
+          <FileText size={14} />
+          <span>Заметки ведущего</span>
         </button>
-
-        <label
-          className="btn"
-          style={{
-            cursor: isBatchImporting ? 'wait' : 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          <Upload size={16} />
-          <span>{isBatchImporting ? 'Импорт…' : 'Импорт партии'}</span>
-          <input
-            type="file"
-            accept="application/json"
-            onChange={handleImportParty}
-            style={{ display: 'none' }}
-            disabled={isBatchImporting}
-          />
-        </label>
-
-        <div className="tiny" style={{ marginLeft: 'auto', fontSize: '13px' }}>
-          Персонажей: {characters.length}
-        </div>
       </div>
 
-      {/* --- Сообщение --- */}
-      {message && (
-        <div
-          className="fade-in-down"
-          style={{
-            marginBottom: '16px',
-            padding: '8px 12px',
-            borderRadius: 'var(--radius-md)',
-            fontSize: '13px',
-            backgroundColor:
-              message.type === 'ok'
-                ? 'var(--success-soft)'
-                : 'var(--danger-soft)',
-            color:
-              message.type === 'ok'
-                ? 'var(--success-text)'
-                : 'var(--danger-text)',
-          }}
-        >
-          {message.text}
-        </div>
-      )}
-
-      {/* --- Сетка персонажей --- */}
-      {characters.length === 0 ? (
-        <div
-          className="panel"
-          style={{ padding: '32px', textAlign: 'center' }}
-        >
-          <p className="muted">
-            В партии пока нет ни одного персонажа.
-          </p>
-          <p className="tiny">
-            Нажмите «Создать персонажа» или загрузите партию из файла.
-          </p>
-        </div>
+      {/* --- Содержимое --- */}
+      {mode === 'notes' ? (
+        <NotesPanel />
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: '16px',
-          }}
-        >
-          {characters.map((c) => (
-            <CharacterCard
-              key={c.id}
-              character={c}
-              isActive={c.id === activeCharacterId}
-              onOpen={() => onSetActive(c.id)}
-              onDelete={() => handleDelete(c.id, c.profile.name)}
-              onWoundsChange={(d) => changeWounds(c.id, d)}
-              onFatigueChange={(d) => changeFatigue(c.id, d)}
-              onBenniesChange={(d) => changeBennies(c.id, d)}
-            />
-          ))}
-        </div>
+        <>
+          {/* Тулбар партии */}
+          <div
+            className="panel"
+            style={{
+              display: 'flex',
+              gap: '8px',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              marginBottom: '20px',
+              padding: '12px',
+            }}
+          >
+            <button
+              onClick={handleCreate}
+              className="btn btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <UserPlus size={16} />
+              <span>Создать персонажа</span>
+            </button>
+
+            <button
+              onClick={handleExportParty}
+              className="btn"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Download size={16} />
+              <span>Экспорт партии</span>
+            </button>
+
+            <label
+              className="btn"
+              style={{
+                cursor: isBatchImporting ? 'wait' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Upload size={16} />
+              <span>{isBatchImporting ? 'Импорт…' : 'Импорт партии'}</span>
+              <input
+                type="file"
+                accept="application/json"
+                onChange={handleImportParty}
+                style={{ display: 'none' }}
+                disabled={isBatchImporting}
+              />
+            </label>
+
+            <div className="tiny" style={{ marginLeft: 'auto', fontSize: '13px' }}>
+              Персонажей: {characters.length}
+            </div>
+          </div>
+
+          {message && (
+            <div
+              className="fade-in-down"
+              style={{
+                marginBottom: '16px',
+                padding: '8px 12px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: '13px',
+                backgroundColor:
+                  message.type === 'ok' ? 'var(--success-soft)' : 'var(--danger-soft)',
+                color:
+                  message.type === 'ok' ? 'var(--success-text)' : 'var(--danger-text)',
+              }}
+            >
+              {message.text}
+            </div>
+          )}
+
+          {characters.length === 0 ? (
+            <div className="panel" style={{ padding: '32px', textAlign: 'center' }}>
+              <p className="muted">В партии пока нет ни одного персонажа.</p>
+              <p className="tiny">
+                Нажмите «Создать персонажа» или загрузите партию из файла.
+              </p>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: '16px',
+              }}
+            >
+              {characters.map((c) => (
+                <CharacterCard
+                  key={c.id}
+                  character={c}
+                  isActive={c.id === activeCharacterId}
+                  onOpen={() => onSetActive(c.id)}
+                  onDelete={() => handleDelete(c.id, c.profile.name)}
+                  onWoundsChange={(d) => changeWounds(c.id, d)}
+                  onFatigueChange={(d) => changeFatigue(c.id, d)}
+                  onBenniesChange={(d) => changeBennies(c.id, d)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -374,7 +360,6 @@ function CharacterCard({
 }) {
   const derived = calculateDerivedStats(character);
   const rank = calculateRank(character.profile.xp);
-
   const totalPenalty = character.wounds + character.fatigue;
 
   return (
@@ -385,12 +370,9 @@ function CharacterCard({
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
-        border: isActive
-          ? '2px solid var(--accent)'
-          : '1px solid var(--border)',
+        border: isActive ? '2px solid var(--accent)' : '1px solid var(--border)',
       }}
     >
-      {/* Заголовок */}
       <div>
         <div
           style={{
@@ -434,27 +416,13 @@ function CharacterCard({
         </div>
       </div>
 
-      {/* Производные */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '8px',
-        }}
-      >
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
         <MiniStat label="Защита" value={derived.parry} />
         <MiniStat label="Стойкость" value={String(derived.toughness)} />
         <MiniStat label="Шаг" value={derived.pace} />
       </div>
 
-      {/* Трекеры */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '8px',
-        }}
-      >
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
         <Tracker
           icon={<Heart size={12} />}
           label="Раны"
@@ -480,7 +448,6 @@ function CharacterCard({
         />
       </div>
 
-      {/* Штраф */}
       {totalPenalty > 0 && (
         <div
           style={{
@@ -497,7 +464,6 @@ function CharacterCard({
         </div>
       )}
 
-      {/* Кнопки */}
       <div style={{ display: 'flex', gap: '6px' }}>
         <button
           onClick={onOpen}
@@ -542,10 +508,7 @@ function MiniStat({ label, value }: { label: string; value: string | number }) {
         borderRadius: 'var(--radius-sm)',
       }}
     >
-      <div
-        className="tiny"
-        style={{ fontSize: '10px', textTransform: 'uppercase' }}
-      >
+      <div className="tiny" style={{ fontSize: '10px', textTransform: 'uppercase' }}>
         {label}
       </div>
       <div style={{ fontWeight: 'bold', fontSize: '16px' }}>{value}</div>

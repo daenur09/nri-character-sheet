@@ -1,51 +1,55 @@
-import { useMemo, useState } from 'react';
+import { useState, useMemo } from 'react';
+import { Plus, X } from 'lucide-react';
 import type { Character, Edge } from '../models/character';
-import { EDGES } from '../data/edges';
-import type { CustomEdge } from '../types/custom-content';
+import { EDGES, type Edge as CatalogEdge } from '../data/edges';
 import { useCustomContent } from '../hooks/useCustomContent';
 import { removeEdge } from '../mechanics/advancement';
-import { Plus, X } from 'lucide-react';
-import { SourceBadge } from './SourceBadge';
 import { checkRequirements, formatRequirements } from '../mechanics/requirements';
-
-/**
- * Преобразует кастомную черту в форму, совместимую с EDGES.
- */
-function customToEdge(c: CustomEdge): typeof EDGES[number] {
-  return {
-    id: c.id,
-    name: c.name,
-    description: c.description,
-    sourceId: 'custom',
-    requirements: c.requirements,
-    effects: c.effects,
-  };
-}
+import { SourceBadge } from './SourceBadge';
 
 interface Props {
   character: Character;
   onChange: (updated: Character) => void;
 }
 
-/**
- * Панель черт (Edges) персонажа.
- * Включает как стандартные черты из EDGES, так и пользовательские.
- */
+/** Преобразует кастомную черту в формат официального каталога. */
+function customToCatalog(c: {
+  id: string;
+  name: string;
+  description: string;
+  requirements?: CatalogEdge['requirements'];
+  effects: CatalogEdge['effects'];
+}): CatalogEdge {
+  return {
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    requirements: c.requirements,
+    effects: c.effects,
+    sourceId: 'custom',
+  };
+}
+
 export function EdgesPanel({ character, onChange }: Props) {
   const [isAdding, setIsAdding] = useState(false);
   const [selectedEdgeId, setSelectedEdgeId] = useState('');
-  const [pendingEdge, setPendingEdge] = useState<typeof EDGES[number] | null>(null);
+  const [pendingEdge, setPendingEdge] = useState<CatalogEdge | null>(null);
 
   const { customEdges } = useCustomContent();
 
-  // Объединяем стандартные и кастомные черты.
-  const allEdges = useMemo(() => {
-    const customAsEdges = (customEdges ?? []).map(customToEdge);
-    return [...EDGES, ...customAsEdges];
+  // Объединённый список: официальные + кастомные
+  const allEdges = useMemo<CatalogEdge[]>(() => {
+    return [
+      ...EDGES,
+      ...(customEdges ?? []).map(customToCatalog),
+    ];
   }, [customEdges]);
 
   const owned = new Set(character.edges.map((e) => e.id));
-  const availableEdges = allEdges.filter((e) => !owned.has(e.id));
+  const available = allEdges.filter((e) => !owned.has(e.id));
+
+  const officialEdges = available.filter((e) => e.sourceId !== 'custom');
+  const customOnly = available.filter((e) => e.sourceId === 'custom');
 
   function handleAdd() {
     if (!selectedEdgeId) return;
@@ -65,9 +69,6 @@ export function EdgesPanel({ character, onChange }: Props) {
           name: pendingEdge.name,
           description: pendingEdge.description,
           sourceId: pendingEdge.sourceId,
-          // ⚡ Сохраняем эффекты явно — критично для кастомных черт,
-          // которых нет в каталоге EDGES. derived.ts сначала смотрит сюда.
-          effects: pendingEdge.effects,
         },
       ],
     };
@@ -87,143 +88,140 @@ export function EdgesPanel({ character, onChange }: Props) {
   }
 
   return (
-    <div className="panel" style={{ marginBottom: '16px' }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '12px',
-        }}
-      >
-        <h3 style={{ margin: 0, fontSize: '16px' }}>Черты (Edges)</h3>
-        <button
-          onClick={() => setIsAdding(!isAdding)}
-          className={`btn ${isAdding ? '' : 'btn-primary'}`}
-          style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+    <>
+      <div className="panel" style={{ marginBottom: '16px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '12px',
+          }}
         >
-          {isAdding ? (
-            <>
-              <X size={14} />
-              <span>Отмена</span>
-            </>
-          ) : (
-            <>
-              <Plus size={14} />
-              <span>Добавить</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {isAdding && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-          <select
-            value={selectedEdgeId}
-            onChange={(e) => setSelectedEdgeId(e.target.value)}
-            className="select"
-            style={{ flex: 1 }}
-          >
-            <option value="">— выберите черту —</option>
-            {availableEdges.map((edge) => {
-              const isCustom = edge.sourceId === 'custom';
-              return (
-                <option key={edge.id} value={edge.id}>
-                  {edge.name}{isCustom ? ' [CUSTOM]' : ''}
-                </option>
-              );
-            })}
-          </select>
+          <h3 style={{ margin: 0, fontSize: '16px' }}>Черты (Edges)</h3>
           <button
-            onClick={handleAdd}
-            disabled={!selectedEdgeId}
-            className="btn btn-success"
+            onClick={() => setIsAdding(!isAdding)}
+            className={`btn ${isAdding ? '' : 'btn-primary'}`}
+            style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            Добавить
+            {isAdding ? (
+              <><X size={14} /><span>Отмена</span></>
+            ) : (
+              <><Plus size={14} /><span>Добавить</span></>
+            )}
           </button>
         </div>
-      )}
 
-      {character.edges.length === 0 ? (
-        <p className="muted" style={{ margin: 0 }}>
-          У персонажа нет черт.
-        </p>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {character.edges.map((edge) => (
-            <div
-              key={edge.id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                padding: '10px 12px',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-md)',
-                backgroundColor: 'var(--bg-tertiary)',
-              }}
+        {isAdding && (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'stretch' }}>
+            <select
+              value={selectedEdgeId}
+              onChange={(e) => setSelectedEdgeId(e.target.value)}
+              className="select"
+              style={{ flex: 1 }}
             >
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontWeight: 'bold',
-                    marginBottom: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <span>{edge.name}</span>
-                  <SourceBadge sourceId={edge.sourceId} small />
-                </div>
-                {edge.description && (
-                  <div className="tiny">{edge.description}</div>
-                )}
-              </div>
-              <button
-                onClick={() => handleRemove(edge)}
-                title="Удалить черту"
+              <option value="">— выберите черту —</option>
+              {officialEdges.length > 0 && (
+                <optgroup label="Официальные">
+                  {officialEdges.map((e) => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {customOnly.length > 0 && (
+                <optgroup label="Пользовательские">
+                  {customOnly.map((e) => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            <button
+              onClick={handleAdd}
+              disabled={!selectedEdgeId}
+              className="btn btn-success"
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              Добавить
+            </button>
+          </div>
+        )}
+
+        {character.edges.length === 0 ? (
+          <p className="muted" style={{ margin: 0 }}>У персонажа нет черт.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {character.edges.map((edge) => (
+              <div
+                key={edge.id}
                 style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--danger)',
-                  cursor: 'pointer',
-                  padding: '0 4px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  padding: '10px 12px',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'var(--bg-tertiary)',
                 }}
               >
-                <X size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      fontWeight: 'bold',
+                      marginBottom: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <span>{edge.name}</span>
+                    <SourceBadge sourceId={edge.sourceId} small />
+                  </div>
+                  {edge.description && (
+                    <div className="tiny">{edge.description}</div>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleRemove(edge)}
+                  title="Удалить черту"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--danger)',
+                    cursor: 'pointer',
+                    padding: '0 4px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {pendingEdge && (
-        <ConfirmDialog
+        <ConfirmEdgeDialog
           edge={pendingEdge}
           character={character}
           onConfirm={confirmAdd}
           onCancel={cancelAdd}
         />
       )}
-    </div>
+    </>
   );
 }
 
-/**
- * Диалог подтверждения добавления черты.
- * Показывает требования и предупреждает, если они не выполнены.
- */
-function ConfirmDialog({
+function ConfirmEdgeDialog({
   edge,
   character,
   onConfirm,
   onCancel,
 }: {
-  edge: typeof EDGES[number];
+  edge: CatalogEdge;
   character: Character;
   onConfirm: () => void;
   onCancel: () => void;
@@ -243,9 +241,7 @@ function ConfirmDialog({
         justifyContent: 'center',
         zIndex: 1100,
       }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel();
-      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div
         className="dialog"
@@ -262,23 +258,13 @@ function ConfirmDialog({
       >
         <h3 style={{ marginTop: 0, marginBottom: '12px' }}>Добавить черту?</h3>
 
-        <div
-          style={{
-            marginBottom: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            flexWrap: 'wrap',
-          }}
-        >
+        <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <strong>{edge.name}</strong>
           <SourceBadge sourceId={edge.sourceId} small />
         </div>
 
         {edge.description && (
-          <p className="tiny" style={{ marginBottom: '12px' }}>
-            {edge.description}
-          </p>
+          <p className="tiny" style={{ marginBottom: '12px' }}>{edge.description}</p>
         )}
 
         {reqText && (
@@ -312,13 +298,7 @@ function ConfirmDialog({
             {check.reasons.map((r, i) => (
               <div key={i}>• {r}</div>
             ))}
-            <div
-              style={{
-                marginTop: '10px',
-                fontSize: '12px',
-                fontStyle: 'italic',
-              }}
-            >
+            <div style={{ marginTop: '10px', fontSize: '12px', fontStyle: 'italic' }}>
               Вы действуете как ведущий и можете добавить черту,
               несмотря на несоблюдение требований.
             </div>
@@ -326,12 +306,8 @@ function ConfirmDialog({
         )}
 
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-          <button onClick={onCancel} className="btn">
-            Отмена
-          </button>
-          <button onClick={onConfirm} className="btn btn-success">
-            Добавить
-          </button>
+          <button onClick={onCancel} className="btn">Отмена</button>
+          <button onClick={onConfirm} className="btn btn-success">Добавить</button>
         </div>
       </div>
     </div>

@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import type { Character, AttributeName, Skill } from '../models/character';
 import type { DieType } from '../mechanics/dice';
 import { dieToNumber } from '../mechanics/dice';
-import { EDGES } from '../data/edges';
+import { EDGES, type Edge as CatalogEdge } from '../data/edges';
+import { useCustomContent } from '../hooks/useCustomContent';
 import { checkRequirements, formatRequirements } from '../mechanics/requirements';
 import {
   canRaiseAttribute,
@@ -34,6 +35,7 @@ interface Props {
 
 export function AdvancementDialog({ character, onApply, onClose }: Props) {
   const [step, setStep] = useState<Step>('choose');
+  const { customEdges } = useCustomContent();
   const [filterMode, setFilterMode] = useState<'available' | 'all'>('available');
   const [selectedAttribute, setSelectedAttribute] = useState<AttributeName | null>(null);
   const [selectedSkill1, setSelectedSkill1] = useState<string | null>(null);
@@ -63,7 +65,18 @@ export function AdvancementDialog({ character, onApply, onClose }: Props) {
    */
   const edgesWithStatus = useMemo(() => {
     const search = searchEdge.toLowerCase().trim();
-    return EDGES.map((edge) => {
+    const allEdges: CatalogEdge[] = [
+      ...EDGES,
+      ...(customEdges ?? []).map((c) => ({
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        requirements: c.requirements,
+        effects: c.effects,
+        sourceId: 'custom',
+      })),
+    ];
+    return allEdges.map((edge) => {
       const alreadyOwned = character.edges.some((e) => e.id === edge.id);
       const check = checkRequirements(character, edge.requirements);
       return {
@@ -79,7 +92,7 @@ export function AdvancementDialog({ character, onApply, onClose }: Props) {
       }
       return true;
     });
-  }, [character, searchEdge, filterMode]);
+  }, [character, searchEdge, filterMode, customEdges]);
 
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
@@ -584,7 +597,7 @@ function StepNewSkill({
 }
 
 interface EdgeItem {
-  edge: typeof EDGES[number];
+  edge: CatalogEdge;
   alreadyOwned: boolean;
   canTake: boolean;
   reasons: string[];

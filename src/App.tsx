@@ -25,9 +25,10 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { RoleSwitcher } from './components/RoleSwitcher';
 import { GameMasterScreen } from './components/GameMaster/GameMasterScreen';
 import { ContentEditor } from './components/ContentEditor/ContentEditor';
+import { InitiativeTracker } from './components/Initiative/InitiativeTracker';
 import { useTheme } from './hooks/useTheme';
 import { useRole } from './hooks/useRole';
-import { ScrollText, Wrench, BookOpen, Skull, Users, FileText } from 'lucide-react';
+import { ScrollText, Wrench, BookOpen, Skull, Users, FileText, Swords } from 'lucide-react';
 
 const DIE_OPTIONS: DieType[] = ['d4', 'd6', 'd8', 'd10', 'd12'];
 
@@ -39,7 +40,7 @@ const ATTRIBUTE_LABELS: Record<AttributeName, string> = {
   vigor: 'Выносливость',
 };
 
-type Tab = 'sheet' | 'editor' | 'rules' | 'bestiary' | 'gm' | 'content';
+type Tab = 'sheet' | 'editor' | 'rules' | 'bestiary' | 'gm' | 'content' | 'combat';
 type SheetMode = 'form' | 'image';
 
 /**
@@ -217,6 +218,23 @@ export function App() {
           onRoleChange={setRole}
         />
         <ContentEditor />
+      </Outer>
+    );
+  }
+
+    // --- Вкладка «Бой» (Трекер инициативы) ---
+  if (activeTab === 'combat') {
+    return (
+      <Outer width={1000}>
+        <TabBar
+          active={activeTab}
+          onChange={setActiveTab}
+          theme={theme}
+          onToggleTheme={toggle}
+          role={role}
+          onRoleChange={setRole}
+        />
+        <InitiativeTracker />
       </Outer>
     );
   }
@@ -780,6 +798,12 @@ function TabBar({
           <span>Контент</span>
         </TabButton>
       )}
+
+      <TabButton active={active === 'combat'} onClick={() => onChange('combat')}>
+        <Swords size={16} />
+        <span>Бой</span>
+      </TabButton>
+
       {role === 'gm' && (
         <TabButton active={active === 'gm'} onClick={() => onChange('gm')}>
           <Users size={16} />

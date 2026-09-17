@@ -8,6 +8,7 @@ import type {
   CustomPower,
   CustomMonster,
 } from '../types/custom-content';
+import type { Note } from '../types/notes';
 
 export class CharacterDatabase extends Dexie {
   characters!: Table<Character, string>;
@@ -17,6 +18,7 @@ export class CharacterDatabase extends Dexie {
   customSkills!: Table<CustomSkill, string>;
   customPowers!: Table<CustomPower, string>;
   customMonsters!: Table<CustomMonster, string>;
+  notes!: Table<Note, string>;
 
   constructor() {
     super('CharacterDatabase');
@@ -48,13 +50,25 @@ export class CharacterDatabase extends Dexie {
       customPowers: 'id, name, createdAt',
       customMonsters: 'id, name, createdAt',
     });
+
+    // Версия 5 — добавляем заметки ведущего.
+    this.version(5).stores({
+      characters: 'id, name',
+      fieldMaps: 'id, name',
+      customEdges: 'id, name, createdAt',
+      customHindrances: 'id, name, createdAt',
+      customSkills: 'id, name, createdAt',
+      customPowers: 'id, name, createdAt',
+      customMonsters: 'id, name, createdAt',
+      notes: 'id, title, updatedAt, isPinned',
+    });
   }
 }
 
 export const db = new CharacterDatabase();
 
 // ============================================================
-// Экспорт и импорт персонажа
+// Экспорт и импорт персонажа (без изменений)
 // ============================================================
 
 export interface ExportBundle {
