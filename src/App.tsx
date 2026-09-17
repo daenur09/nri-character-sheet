@@ -10,7 +10,7 @@ import type { Character, AttributeName } from './models/character';
 import type { FieldMap } from './types/fieldmap';
 import { db } from './db/database';
 import { DEMO_CHARACTER } from './data/demo-character';
-import { RollResultDisplay } from './components/RollResultDisplay';
+import { RollResultModal } from './components/RollResultModal';
 import { AdvancementDialog } from './components/AdvancementDialog';
 import { EdgesPanel } from './components/EdgesPanel';
 import { HindrancesPanel } from './components/HindrancesPanel';
@@ -676,23 +676,6 @@ function SheetForm({
         totalPenalty={totalPenalty}
       />
 
-      {/* --- Результат броска --- */}
-      <h2 style={{ marginTop: '24px' }}>Результат последнего броска</h2>
-      {lastRoll ? (
-        <RollResultDisplay
-          result={lastRoll}
-          bennies={character.bennies}
-          canReroll={!!lastRollSource}
-          onReroll={handleReroll}
-          alreadyRerolled={rerolledFor === rollCounter}
-          onNextTurn={onNextTurn}
-        />
-      ) : (
-        <p className="muted">
-          Нажмите «Бросить» у любого навыка или «Бросок −2» у атрибута.
-        </p>
-      )}
-
       {/* --- Модальное окно повышения --- */}
       {isAdvancementOpen && (
         <AdvancementDialog
@@ -717,6 +700,25 @@ function SheetForm({
       <button onClick={resetDatabase} className="btn btn-danger">
         Сбросить все данные
       </button>
+
+      {/* --- Модальное окно результата броска ---
+          Показывается автоматически, как только lastRoll !== null.
+          Закрытие (= onNextTurn) очищает lastRoll и разблокирует броски. */}
+      {lastRoll && (
+        <RollResultModal
+          result={lastRoll}
+          bennies={character.bennies}
+          canReroll={!!lastRollSource}
+          onReroll={handleReroll}
+          alreadyRerolled={rerolledFor === rollCounter}
+          onNextTurn={onNextTurn}
+          rollLabel={
+            lastRollSource?.kind === 'attribute'
+              ? `Бросок атрибута: ${ATTRIBUTE_LABELS[lastRollSource.name]} (штраф −2)`
+              : 'Бросок навыка'
+          }
+        />
+      )}
     </>
   );
 }

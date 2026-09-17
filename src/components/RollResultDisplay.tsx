@@ -5,7 +5,7 @@ interface Props {
   result: SkillRollResult;
   /** Количество доступных фишек у персонажа. */
   bennies?: number;
-  /** Можно ли перебрасывать (после броска навыка). */
+  /** Можно ли перебрасывать (после броска навыка/атрибута). */
   canReroll?: boolean;
   /** Колбэк переброса. */
   onReroll?: () => void;
@@ -13,6 +13,11 @@ interface Props {
   alreadyRerolled?: boolean;
   /** Колбэк «Следующее действие» — сбросить блокировку и позволить бросить снова. */
   onNextTurn?: () => void;
+  /**
+   * Заголовок блока броска. По умолчанию «Бросок навыка».
+   * Для броска атрибута передавайте «Бросок атрибута».
+   */
+  rollLabel?: string;
 }
 
 /**
@@ -25,6 +30,7 @@ export function RollResultDisplay({
   onReroll,
   alreadyRerolled = false,
   onNextTurn,
+  rollLabel = 'Бросок навыка',
 }: Props) {
   const canUseReroll =
     canReroll &&
@@ -44,7 +50,7 @@ export function RollResultDisplay({
       }}
     >
       <div style={{ marginBottom: '8px' }}>
-        <strong>Бросок навыка:</strong>{' '}
+        <strong>{rollLabel}:</strong>{' '}
         {result.skillRoll.rolls.join(' + ')} = {result.skillRoll.total}
         {result.skillRoll.rolls.length > 1 && (
           <span
