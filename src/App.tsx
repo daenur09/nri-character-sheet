@@ -14,6 +14,7 @@ import { RollResultDisplay } from './components/RollResultDisplay';
 import { AdvancementDialog } from './components/AdvancementDialog';
 import { EdgesPanel } from './components/EdgesPanel';
 import { HindrancesPanel } from './components/HindrancesPanel';
+import { SkillsPanel } from './components/SkillsPanel';
 import { FieldEditor } from './components/FieldEditor/FieldEditor';
 import { SheetView } from './components/SheetView/SheetView';
 import { RuleBook } from './components/RuleBook/RuleBook';
@@ -378,19 +379,6 @@ function SheetForm({
     );
   }
 
-  function setSkillDie(skillName: string, die: DieType) {
-    setCharacter((c) =>
-      c
-        ? {
-            ...c,
-            skills: c.skills.map((s) =>
-              s.name === skillName ? { ...s, die } : s
-            ),
-          }
-        : c
-    );
-  }
-
   function changeXp(delta: number) {
     setCharacter((c) =>
       c
@@ -684,92 +672,13 @@ function SheetForm({
       <HindrancesPanel character={character} onChange={setCharacter} />
 
       {/* --- Навыки --- */}
-      <h2>Навыки</h2>
-      {hasRolled && (
-        <div
-          className="tiny"
-          style={{
-            padding: '8px 12px',
-            backgroundColor: 'var(--warning-soft)',
-            color: 'var(--warning-text)',
-            borderRadius: 'var(--radius-md)',
-            marginBottom: '8px',
-            fontSize: '13px',
-          }}
-        >
-          Действие уже выполнено. Нажмите «Следующее действие» ниже,
-          чтобы разблокировать броски.
-        </div>
-      )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {character.skills.map((skill) => (
-          <div
-            key={skill.name}
-            className="panel"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              opacity: hasRolled ? 0.7 : 1,
-            }}
-          >
-            <span style={{ flex: 1 }}>
-              <strong>{skill.name}</strong>
-              <span className="tiny" style={{ marginLeft: '8px', fontSize: '13px' }}>
-                ({ATTRIBUTE_LABELS[skill.attribute]})
-              </span>
-              {totalPenalty > 0 && (
-                <span
-                  style={{
-                    color: 'var(--danger)',
-                    marginLeft: '8px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  штраф −{totalPenalty}
-                </span>
-              )}
-            </span>
-            <select
-              value={skill.die}
-              onChange={(e) => setSkillDie(skill.name, e.target.value as DieType)}
-              className="select"
-              style={{
-                fontSize: '14px',
-                fontWeight: 'bold',
-                padding: '6px',
-                width: 'auto',
-                marginRight: '12px',
-              }}
-            >
-              {DIE_OPTIONS.map((die) => (
-                <option key={die} value={die}>{die}</option>
-              ))}
-            </select>
-            <button
-              onClick={() => handleRollSkill(skill.name)}
-              className="btn btn-primary"
-              disabled={hasRolled}
-              style={
-                hasRolled
-                  ? {
-                      opacity: 0.5,
-                      cursor: 'not-allowed',
-                    }
-                  : undefined
-              }
-              title={
-                hasRolled
-                  ? 'Сначала завершите текущее действие'
-                  : undefined
-              }
-            >
-              Бросить
-            </button>
-          </div>
-        ))}
-      </div>
+      <SkillsPanel
+        character={character}
+        onChange={setCharacter}
+        hasRolled={hasRolled}
+        onRollSkill={handleRollSkill}
+        totalPenalty={totalPenalty}
+      />
 
       {/* --- Результат броска --- */}
       <h2 style={{ marginTop: '24px' }}>Результат последнего броска</h2>
