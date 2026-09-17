@@ -1,23 +1,37 @@
-import type { Character, DerivedStats, AttributeName } from '../models/character';
+import type {
+  Character,
+  DerivedStats,
+  AttributeName,
+  Edge,
+  Hindrance,
+} from '../models/character';
 import { dieToNumber } from './dice';
 import { EDGES, type EdgeEffects } from '../data/edges';
 import { HINDRANCES } from '../data/hindrances';
 
 /**
- * Находит эффекты черты по её id в каталоге.
- * Если черты нет в каталоге (кастомная) — возвращает пустой объект.
+ * Возвращает эффекты черты персонажа.
+ *
+ * Приоритет:
+ *   1) собственное поле `edge.effects` (заполнено при добавлении —
+ *      важно для кастомных черт, которых нет в каталоге EDGES);
+ *   2) каталог EDGES по `id` (фолбэк для старых сохранений);
+ *   3) пустой объект.
+ *
+ * Такая схема даёт прозрачную миграцию: старые персонажи в IndexedDB
+ * не имеют поля `effects`, но при расчёте производных они получают
+ * эффекты из каталога. Новые — уже хранят effects явно.
  */
-function getEdgeEffects(edgeId: string): EdgeEffects {
-  const edge = EDGES.find((e) => e.id === edgeId);
-  return edge?.effects ?? {};
+function getEdgeEffects(edge: Edge): EdgeEffects {
+  if (edge.effects) return edge.effects;
+  const fromCatalog = EDGES.find((e) => e.id === edge.id);
+  return fromCatalog?.effects ?? {};
 }
 
-/**
- * Находит эффекты изъяна по его id в каталоге.
- */
-function getHindranceEffects(hindranceId: string): EdgeEffects {
-  const hindrance = HINDRANCES.find((h) => h.id === hindranceId);
-  return hindrance?.effects ?? {};
+function getHindranceEffects(hindrance: Hindrance): EdgeEffects {
+  if (hindrance.effects) return hindrance.effects;
+  const fromCatalog = HINDRANCES.find((h) => h.id === hindrance.id);
+  return fromCatalog?.effects ?? {};
 }
 
 /**
@@ -37,14 +51,14 @@ function getEffectiveAttribute(
   let value = dieToNumber(character.attributes[attribute]);
 
   for (const edge of character.edges) {
-    const effects = getEdgeEffects(edge.id);
+    const effects = getEdgeEffects(edge);
     if (effects.attributeBonus?.[attribute]) {
       value += effects.attributeBonus[attribute]!;
     }
   }
 
   for (const hindrance of character.hindrances) {
-    const effects = getHindranceEffects(hindrance.id);
+    const effects = getHindranceEffects(hindrance);
     if (effects.attributeBonus?.[attribute]) {
       value += effects.attributeBonus[attribute]!;
     }
@@ -63,14 +77,14 @@ function getEffectiveSkill(character: Character, skillName: string): number {
   let value = dieToNumber(skill.die) + skill.modifier;
 
   for (const edge of character.edges) {
-    const effects = getEdgeEffects(edge.id);
+    const effects = getEdgeEffects(edge);
     if (effects.skillBonus?.[skillName]) {
       value += effects.skillBonus[skillName]!;
     }
   }
 
   for (const hindrance of character.hindrances) {
-    const effects = getHindranceEffects(hindrance.id);
+    const effects = getHindranceEffects(hindrance);
     if (effects.skillBonus?.[skillName]) {
       value += effects.skillBonus[skillName]!;
     }
@@ -81,7 +95,11 @@ function getEffectiveSkill(character: Character, skillName: string): number {
 
 /**
  * Рассчитывает производные параметры персонажа.
- * Учитывает эффекты всех черт и изъянов, взятые из каталогов.
+ *
+ * Учитывает эффекты всех черт и изъянов:
+ *  - сначала берётся собственное поле `effects` (для кастомных);
+ *  - если его нет — эффекты подставляются из каталога по `id`
+ *    (прозрачная миграция старых сохранений).
  */
 export function calculateDerivedStats(character: Character): DerivedStats {
   // --- Parry ---
@@ -89,7 +107,11 @@ export function calculateDerivedStats(character: Character): DerivedStats {
   let parry = 2 + Math.floor(fightingDie / 2);
 
   for (const edge of character.edges) {
-    const effects = getEdgeEffects(edge.id);
+    const effects = getEdgeEffects(edge);
+    if (effects.parryBonus) parry += effects.parryBonus;
+  }
+  for (const hindrance of character.hindrances) {
+    const effects = getHindranceEffects(hindrance);
     if (effects.parryBonus) parry += effects.parryBonus;
   }
 
@@ -98,11 +120,11 @@ export function calculateDerivedStats(character: Character): DerivedStats {
   let toughness = 2 + Math.floor(vigorValue / 2);
 
   for (const edge of character.edges) {
-    const effects = getEdgeEffects(edge.id);
+    const effects = getEdgeEffects(edge);
     if (effects.toughnessBonus) toughness += effects.toughnessBonus;
   }
   for (const hindrance of character.hindrances) {
-    const effects = getHindranceEffects(hindrance.id);
+    const effects = getHindranceEffects(hindrance);
     if (effects.toughnessBonus) toughness += effects.toughnessBonus;
   }
 
@@ -110,11 +132,11 @@ export function calculateDerivedStats(character: Character): DerivedStats {
   let charisma = 0;
 
   for (const edge of character.edges) {
-    const effects = getEdgeEffects(edge.id);
+    const effects = getEdgeEffects(edge);
     if (effects.charismaBonus) charisma += effects.charismaBonus;
   }
   for (const hindrance of character.hindrances) {
-    const effects = getHindranceEffects(hindrance.id);
+    const effects = getHindranceEffects(hindrance);
     if (effects.charismaBonus) charisma += effects.charismaBonus;
   }
 
@@ -122,11 +144,11 @@ export function calculateDerivedStats(character: Character): DerivedStats {
   let pace = 6;
 
   for (const edge of character.edges) {
-    const effects = getEdgeEffects(edge.id);
+    const effects = getEdgeEffects(edge);
     if (effects.paceBonus) pace += effects.paceBonus;
   }
   for (const hindrance of character.hindrances) {
-    const effects = getHindranceEffects(hindrance.id);
+    const effects = getHindranceEffects(hindrance);
     if (effects.paceBonus) pace += effects.paceBonus;
   }
 

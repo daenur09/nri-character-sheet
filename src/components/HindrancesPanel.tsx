@@ -49,10 +49,6 @@ export function HindrancesPanel({ character, onChange }: Props) {
   const owned = new Set(character.hindrances.map((h) => h.id));
   const availableHindrances = allHindrances.filter((h) => !owned.has(h.id));
 
-  /**
-   * Шаг 1: пользователь выбирает изъян и нажимает «Добавить» —
-   * открывается диалог подтверждения.
-   */
   function handleAdd() {
     if (!selectedHindranceId) return;
     const hindrance = allHindrances.find((h) => h.id === selectedHindranceId);
@@ -60,11 +56,10 @@ export function HindrancesPanel({ character, onChange }: Props) {
     setPendingHindrance(hindrance);
   }
 
-  /**
-   * Шаг 2: ведущий подтверждает добавление — изъян попадает в лист.
-   */
   function confirmAdd() {
     if (!pendingHindrance) return;
+
+    // addHindrance создаёт стандартный объект без поля effects.
     const updated = addHindrance(
       character,
       pendingHindrance.id,
@@ -73,8 +68,17 @@ export function HindrancesPanel({ character, onChange }: Props) {
       pendingHindrance.sourceId,
       pendingHindrance.description
     );
+
     if (updated) {
-      onChange(updated);
+      // ⚡ Дописываем эффекты по id — критично для кастомных изъянов
+      // и для сохранения явных effects в новом персонаже.
+      const hindrances = updated.hindrances.map((h) =>
+        h.id === pendingHindrance.id
+          ? { ...h, effects: pendingHindrance.effects }
+          : h
+      );
+
+      onChange({ ...updated, hindrances });
       setPendingHindrance(null);
       setSelectedHindranceId('');
       setIsAdding(false);
@@ -244,7 +248,6 @@ export function HindrancesPanel({ character, onChange }: Props) {
 
 /**
  * Диалог подтверждения добавления изъяна.
- * Показывает требования (если есть) и предупреждает, если они не выполнены.
  */
 function ConfirmHindranceDialog({
   hindrance,
@@ -366,13 +369,7 @@ function ConfirmHindranceDialog({
           </div>
         )}
 
-        <div
-          style={{
-            display: 'flex',
-            gap: '8px',
-            justifyContent: 'flex-end',
-          }}
-        >
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
           <button onClick={onCancel} className="btn">
             Отмена
           </button>

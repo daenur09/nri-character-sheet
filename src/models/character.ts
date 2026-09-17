@@ -1,4 +1,5 @@
 import type { DieType } from '../mechanics/dice';
+import type { EdgeEffects } from '../data/edges';
 
 export type AttributeName =
   | 'agility'
@@ -34,6 +35,15 @@ export interface Edge {
   description: string;
   /** Источник контента. */
   sourceId?: string;
+  /**
+   * Механические эффекты черты.
+   *
+   * Для новых сохранений — заполняется явно из каталога EDGES
+   * или из CustomEdge. Для старых сохранений может отсутствовать:
+   * в этом случае `mechanics/derived.ts` возьмёт эффекты
+   * из каталога EDGES по `id` (прозрачная миграция).
+   */
+  effects?: EdgeEffects;
 }
 
 /**
@@ -46,6 +56,8 @@ export interface Hindrance {
   severity: 'minor' | 'major';
   /** Источник контента. */
   sourceId?: string;
+  /** См. комментарий в `Edge.effects`. */
+  effects?: EdgeEffects;
 }
 
 /**

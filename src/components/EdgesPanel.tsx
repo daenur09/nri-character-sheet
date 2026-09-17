@@ -51,8 +51,6 @@ export function EdgesPanel({ character, onChange }: Props) {
     if (!selectedEdgeId) return;
     const edge = allEdges.find((e) => e.id === selectedEdgeId);
     if (!edge) return;
-
-    // Показываем диалог подтверждения — это «ручной режим» ведущего.
     setPendingEdge(edge);
   }
 
@@ -67,6 +65,9 @@ export function EdgesPanel({ character, onChange }: Props) {
           name: pendingEdge.name,
           description: pendingEdge.description,
           sourceId: pendingEdge.sourceId,
+          // ⚡ Сохраняем эффекты явно — критично для кастомных черт,
+          // которых нет в каталоге EDGES. derived.ts сначала смотрит сюда.
+          effects: pendingEdge.effects,
         },
       ],
     };
@@ -259,9 +260,7 @@ function ConfirmDialog({
           border: '1px solid var(--border)',
         }}
       >
-        <h3 style={{ marginTop: 0, marginBottom: '12px' }}>
-          Добавить черту?
-        </h3>
+        <h3 style={{ marginTop: 0, marginBottom: '12px' }}>Добавить черту?</h3>
 
         <div
           style={{
@@ -326,13 +325,7 @@ function ConfirmDialog({
           </div>
         )}
 
-        <div
-          style={{
-            display: 'flex',
-            gap: '8px',
-            justifyContent: 'flex-end',
-          }}
-        >
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
           <button onClick={onCancel} className="btn">
             Отмена
           </button>
