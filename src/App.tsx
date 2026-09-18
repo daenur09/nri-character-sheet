@@ -15,6 +15,7 @@ import { AdvancementDialog } from './components/AdvancementDialog';
 import { EdgesPanel } from './components/EdgesPanel';
 import { HindrancesPanel } from './components/HindrancesPanel';
 import { SkillsPanel } from './components/SkillsPanel';
+import { PowersPanel } from './components/PowersPanel';
 import { AttributesPanel } from './components/AttributesPanel';
 import { FieldEditor } from './components/FieldEditor/FieldEditor';
 import { SheetView } from './components/SheetView/SheetView';
@@ -44,13 +45,16 @@ type Tab = 'sheet' | 'editor' | 'rules' | 'bestiary' | 'gm' | 'content' | 'comba
 type SheetMode = 'form' | 'image';
 
 /**
- * Источник последнего броска — навык или атрибут.
- * Нужен для корректного переброса за фишку: для атрибута
- * повторно применяется штраф −2, для навыка — его модификатор.
+ * Источник последнего броска — навык, атрибут или сила.
+ * Нужен для корректного переброса за фишку:
+ *  - для атрибута повторно применяется штраф −2,
+ *  - для навыка/силы — модификатор соответствующего навыка,
+ *  - для силы, у которой кастующий навык не найден, — d4 и −2.
  */
 type RollSource =
   | { kind: 'skill'; name: string }
-  | { kind: 'attribute'; name: AttributeName };
+  | { kind: 'attribute'; name: AttributeName }
+  | { kind: 'power'; id: string; name: string };
 
 export function App() {
   const [character, setCharacter] = useState<Character | null>(null);
@@ -222,7 +226,7 @@ export function App() {
     );
   }
 
-    // --- Вкладка «Бой» (Трекер инициативы) ---
+  // --- Вкладка «Бой» (Трекер инициативы) ---
   if (activeTab === 'combat') {
     return (
       <Outer width={1000}>
@@ -442,11 +446,11 @@ function SheetForm({
       skill.attribute === 'agility' || skill.attribute === 'strength';
     const encumbrancePenalty = isAgiOrStr ? enc.penalty : 0;
 
-    const totalPenalty = basicPenalty + encumbrancePenalty;
+    const total = basicPenalty + encumbrancePenalty;
 
     const result = rollSkill(
       skill.die,
-      skill.modifier - totalPenalty,
+      skill.modifier - total,
       character.isWildCard
     );
     setLastRollSource({ kind: 'skill', name: skillName });
@@ -454,10 +458,6 @@ function SheetForm({
   }
 
   /**
-   * Бросок атрибута со штрафом −2 (правило SWADE, когда нет нужного навыка).
-   * Дополнительно вычитаются ранения и усталость.
-   */
-    /**
    * Бросок атрибута со штрафом −2 (правило SWADE, когда нет нужного навыка).
    * Дополнительно вычитаются ранения, усталость и (для Ловкости/Силы) нагрузка.
    */
@@ -471,14 +471,64 @@ function SheetForm({
     const isAgiOrStr = attr === 'agility' || attr === 'strength';
     const encumbrancePenalty = isAgiOrStr ? enc.penalty : 0;
 
-    const totalPenalty = basicPenalty + encumbrancePenalty;
+    const total = basicPenalty + encumbrancePenalty;
 
     const result = rollSkill(
       character.attributes[attr],
-      -2 - totalPenalty,
+      -2 - total,
       character.isWildCard
     );
     setLastRollSource({ kind: 'attribute', name: attr });
+    onRoll(result);
+  }
+
+  /**
+   * Бросок силы. Использует кубик и модификатор кастующего навыка,
+   * если такой навык есть у персонажа. Иначе — неподготовленный
+   * бросок d4 −2. Штрафы за ранения/усталость применяются всегда,
+   * штраф за нагрузку — только если соответствующий навык
+   * привязан к Ловкости или Силе.
+   */
+  function handleRollPower(powerInstanceId: string) {
+    if (hasRolled) return;
+    const power = (character.powers ?? []).find(
+      (p) => p.id === powerInstanceId
+    );
+    if (!power) return;
+
+    const castingSkillName = power.castingSkill.trim();
+    const skill = castingSkillName
+      ? character.skills.find((s) => s.name === castingSkillName)
+      : undefined;
+
+    const basicPenalty = character.wounds + character.fatigue;
+    const enc = getEncumbranceInfo(character);
+
+    let die: DieType;
+    let baseModifier: number;
+    let applyEncumbrance = false;
+
+    if (skill) {
+      die = skill.die;
+      baseModifier = skill.modifier;
+      applyEncumbrance =
+        skill.attribute === 'agility' || skill.attribute === 'strength';
+    } else {
+      // Кастующий навык не найден — бросок как неподготовленный.
+      die = 'd4';
+      baseModifier = -2;
+      applyEncumbrance = false;
+    }
+
+    const encumbrancePenalty = applyEncumbrance ? enc.penalty : 0;
+    const total = basicPenalty + encumbrancePenalty;
+
+    const result = rollSkill(
+      die,
+      baseModifier - total,
+      character.isWildCard
+    );
+    setLastRollSource({ kind: 'power', id: power.id, name: power.name });
     onRoll(result);
   }
 
@@ -494,12 +544,33 @@ function SheetForm({
     let applyEncumbrance = false;
 
     if (lastRollSource.kind === 'skill') {
-      const skill = character.skills.find((s) => s.name === lastRollSource.name);
+      const skill = character.skills.find(
+        (s) => s.name === lastRollSource.name
+      );
       if (!skill) return;
       die = skill.die;
       baseModifier = skill.modifier;
       applyEncumbrance =
         skill.attribute === 'agility' || skill.attribute === 'strength';
+    } else if (lastRollSource.kind === 'power') {
+      const power = (character.powers ?? []).find(
+        (p) => p.id === lastRollSource.id
+      );
+      if (!power) return;
+      const castingSkillName = power.castingSkill.trim();
+      const skill = castingSkillName
+        ? character.skills.find((s) => s.name === castingSkillName)
+        : undefined;
+      if (skill) {
+        die = skill.die;
+        baseModifier = skill.modifier;
+        applyEncumbrance =
+          skill.attribute === 'agility' || skill.attribute === 'strength';
+      } else {
+        die = 'd4';
+        baseModifier = -2;
+        applyEncumbrance = false;
+      }
     } else {
       die = character.attributes[lastRollSource.name];
       // Штраф −2 за отсутствие навыка сохраняется при перебросе
@@ -513,11 +584,11 @@ function SheetForm({
     const basicPenalty = character.wounds + character.fatigue;
     const enc = getEncumbranceInfo(character);
     const encumbrancePenalty = applyEncumbrance ? enc.penalty : 0;
-    const totalPenalty = basicPenalty + encumbrancePenalty;
+    const total = basicPenalty + encumbrancePenalty;
 
     const newResult = rollSkill(
       die,
-      baseModifier - totalPenalty,
+      baseModifier - total,
       character.isWildCard
     );
 
@@ -731,6 +802,15 @@ function SheetForm({
         totalPenalty={totalPenalty}
       />
 
+      {/* --- Силы --- */}
+      <PowersPanel
+        character={character}
+        onChange={setCharacter}
+        hasRolled={hasRolled}
+        onRollPower={handleRollPower}
+        totalPenalty={totalPenalty}
+      />
+
       {/* --- Модальное окно повышения --- */}
       {isAdvancementOpen && (
         <AdvancementDialog
@@ -770,7 +850,9 @@ function SheetForm({
           rollLabel={
             lastRollSource?.kind === 'attribute'
               ? `Бросок атрибута: ${ATTRIBUTE_LABELS[lastRollSource.name]}`
-              : 'Бросок навыка'
+              : lastRollSource?.kind === 'power'
+                ? `Бросок силы: ${lastRollSource.name}`
+                : 'Бросок навыка'
           }
         />
       )}

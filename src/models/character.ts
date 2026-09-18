@@ -73,6 +73,42 @@ export interface Advancement {
 }
 
 /**
+ * Одна сила, выбранная персонажем.
+ *
+ * Данные денормализованы из исходного `CustomPower` — это сделано
+ * сознательно: если ведущий позже удалит силу из каталога, у персонажа
+ * всё равно останется рабочая копия. Поле `powerId` хранится для справки.
+ *
+ * `castingSkill` — имя навыка персонажа, которым активируется сила
+ * (например, «Магия», «Вера», «Псионика»). Если такого навыка у персонажа
+ * нет — бросок идёт как неподготовленный (d4 −2).
+ */
+export interface PowerInstance {
+  /** Уникальный id экземпляра (не совпадает с id каталога). */
+  id: string;
+  /** Ссылка на исходный CustomPower.id. */
+  powerId?: string;
+  /** Название силы. */
+  name: string;
+  /** Описание. */
+  description: string;
+  /** Ранг силы. */
+  rank: string;
+  /** Стоимость в ОД. */
+  cost: string;
+  /** Дистанция. */
+  range: string;
+  /** Длительность. */
+  duration: string;
+  /** Аспекты (опционально). */
+  aspects?: string;
+  /** Имя кастующего навыка (по названию навыка персонажа). */
+  castingSkill: string;
+  /** Источник контента: 'custom'. */
+  sourceId?: string;
+}
+
+/**
  * Модель персонажа.
  */
 export interface Character {
@@ -95,10 +131,12 @@ export interface Character {
   bennies: number;
   advancements: Advancement[];
   attributesRaisedThisRank: AttributeName[];
-/** Инвентарь персонажа */
+  /** Инвентарь персонажа */
   inventory?: InventoryItem[];
-/** Деньги в лунах */
+  /** Деньги в лунах */
   money?: number;
+  /** Силы персонажа (создаются из кастомного контента). */
+  powers?: PowerInstance[];
 }
 
 /**
