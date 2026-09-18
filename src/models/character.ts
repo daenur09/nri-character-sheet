@@ -1,5 +1,6 @@
 import type { DieType } from '../mechanics/dice';
 import type { EdgeEffects } from '../data/edges';
+import type { InventoryItem } from '../types/gear';
 
 export type AttributeName =
   | 'agility'
@@ -94,6 +95,10 @@ export interface Character {
   bennies: number;
   advancements: Advancement[];
   attributesRaisedThisRank: AttributeName[];
+/** Инвентарь персонажа */
+  inventory?: InventoryItem[];
+/** Деньги в лунах */
+  money?: number;
 }
 
 /**

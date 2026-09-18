@@ -1,0 +1,62 @@
+// src/data/gear.ts
+import type { Weapon, Armor, GearItem } from '../types/gear';
+
+export const WEAPONS: Weapon[] = [
+  { id: 'unarmed',      name: 'Без оружия',       damage: 'Str',       range: 'Вплотную', weight: 0,    cost: 0,   notes: 'Кулаки, ноги' },
+  { id: 'dagger',       name: 'Кинжал',           damage: 'Str+d4',    range: 'Вплотную', weight: 0.5,  cost: 25,  notes: 'Метательное 2/4/8' },
+  { id: 'short-sword',  name: 'Короткий меч',     damage: 'Str+d6',    range: 'Вплотную', weight: 1,    cost: 100 },
+  { id: 'long-sword',   name: 'Длинный меч',      damage: 'Str+d8',    range: 'Вплотную', weight: 1.5,  cost: 300 },
+  { id: 'great-sword',  name: 'Двуручный меч',    damage: 'Str+d10',   range: 'Вплотную', weight: 3,    cost: 500, notes: 'Двуручное' },
+  { id: 'rapier',       name: 'Рапира',           damage: 'Str+d4',    range: 'Вплотную', weight: 1,    cost: 200, notes: '+1 Parry' },
+  { id: 'battle-axe',   name: 'Боевой топор',     damage: 'Str+d8',    range: 'Вплотную', weight: 2,    cost: 300 },
+  { id: 'great-axe',    name: 'Двуручный топор',  damage: 'Str+d10',   range: 'Вплотную', weight: 3.5,  cost: 450, notes: 'Двуручное' },
+  { id: 'mace',         name: 'Булава',           damage: 'Str+d6',    range: 'Вплотную', weight: 1.5,  cost: 100 },
+  { id: 'warhammer',    name: 'Боевой молот',     damage: 'Str+d8',    range: 'Вплотную', weight: 2,    cost: 250 },
+  { id: 'spear',        name: 'Копьё',            damage: 'Str+d6',    range: 'Вплотную', weight: 1.5,  cost: 100, notes: 'Метательное 3/6/12' },
+  { id: 'halberd',      name: 'Алебарда',         damage: 'Str+d8',    range: 'Досягаемость 1', weight: 3, cost: 250, notes: 'Двуручное' },
+  { id: 'bow',          name: 'Лук',              damage: '2d6',       range: '12/24/48', weight: 1,    cost: 250 },
+  { id: 'crossbow',     name: 'Арбалет',          damage: '2d6',       range: '15/30/60', weight: 2.5,  cost: 500, notes: 'Перезарядка 1' },
+  { id: 'pistol',       name: 'Пистолет',         damage: '2d6',       range: '10/20/40', weight: 1,    cost: 150, notes: 'Патроны' },
+  { id: 'rifle',        name: 'Винтовка',         damage: '2d8',       range: '24/48/96', weight: 3,    cost: 300, notes: 'Патроны' },
+  { id: 'shotgun',      name: 'Дробовик',         damage: '1-3d6',     range: '12/24/48', weight: 3,    cost: 150, notes: 'Разброс' },
+];
+
+export const ARMOR: Armor[] = [
+  { id: 'leather',      name: 'Кожаная броня',    armorBonus: 1, weight: 5,  cost: 50,  notes: 'Торс, руки, ноги' },
+  { id: 'chain',        name: 'Кольчуга',         armorBonus: 2, weight: 10, cost: 300, notes: 'Торс, руки, ноги' },
+  { id: 'plate',        name: 'Латы',             armorBonus: 3, weight: 20, cost: 800, notes: 'Полный доспех' },
+  { id: 'helmet',       name: 'Шлем',             armorBonus: 3, weight: 1,  cost: 100, notes: 'Только голова' },
+  { id: 'small-shield', name: 'Малый щит',        armorBonus: 1, weight: 2,  cost: 50,  notes: '+1 Parry' },
+  { id: 'med-shield',   name: 'Средний щит',      armorBonus: 1, weight: 3,  cost: 100, notes: '+1 Parry, +2 Cover' },
+  { id: 'large-shield', name: 'Большой щит',      armorBonus: 2, weight: 5,  cost: 200, notes: '+2 Parry, +4 Cover' },
+  { id: 'buckler',      name: 'Баклер',           armorBonus: 1, weight: 1,  cost: 25,  notes: '+1 Parry' },
+  { id: 'gambeson',     name: 'Стёганый доспех',  armorBonus: 1, weight: 3,  cost: 30,  notes: 'Торс' },
+];
+
+export const GEAR: GearItem[] = [
+  { id: 'backpack',     name: 'Рюкзак',           description: 'Вмещает до 20 кг', weight: 1,   cost: 25 },
+  { id: 'bedroll',      name: 'Спальник',         description: 'Тёплый спальник',   weight: 2,   cost: 10 },
+  { id: 'blanket',      name: 'Одеяло',           description: 'Простое одеяло',    weight: 1.5, cost: 5 },
+  { id: 'rope-15m',     name: 'Верёвка 15 м',     description: 'Пеньковая',         weight: 3,   cost: 10 },
+  { id: 'torch',        name: 'Факел',            description: 'Горит 1 час',       weight: 0.5, cost: 1 },
+  { id: 'lantern',      name: 'Фонарь',           description: 'Масляный',          weight: 1,   cost: 25 },
+  { id: 'oil',          name: 'Масло (фляга)',    description: 'Для фонаря',        weight: 0.5, cost: 2 },
+  { id: 'waterskin',    name: 'Фляга для воды',   description: '1 литр',            weight: 0.5, cost: 5 },
+  { id: 'rations',      name: 'Паёк (1 день)',    description: 'Сушёная еда',       weight: 0.5, cost: 2 },
+  { id: 'flint-steel',  name: 'Кремень и кресало', description: 'Разжечь огонь',    weight: 0.2, cost: 3 },
+  { id: 'whetstone',    name: 'Точильный камень', description: 'Править клинки',    weight: 0.3, cost: 2 },
+  { id: 'shovel',       name: 'Лопата',           description: 'Копать',            weight: 2,   cost: 5 },
+  { id: 'crowbar',      name: 'Лом',              description: 'Инструмент',        weight: 2.5, cost: 10 },
+  { id: 'hammer',       name: 'Молоток',          description: 'Инструмент',        weight: 1,   cost: 5 },
+  { id: 'nails',        name: 'Гвозди (10 шт)',   description: 'Мелкие гвозди',     weight: 0.2, cost: 1 },
+  { id: 'lockpicks',    name: 'Отмычки',          description: 'Для замков',        weight: 0.1, cost: 50 },
+  { id: 'manacles',     name: 'Кандалы',          description: 'Сковать пленного',  weight: 1,   cost: 15 },
+  { id: 'healing-kit',  name: 'Набор лекаря',     description: '+1 к Healing (3) ', weight: 1,   cost: 100 },
+  { id: 'antidote',     name: 'Противоядие',      description: 'Против яда',        weight: 0.2, cost: 50 },
+  { id: 'compass',      name: 'Компас',           description: 'Ориентирование',    weight: 0.1, cost: 100 },
+  { id: 'map',          name: 'Карта',            description: 'Бумажная',          weight: 0.1, cost: 10 },
+  { id: 'spyglass',     name: 'Подзорная труба',  description: 'Дальний обзор',     weight: 0.5, cost: 250 },
+  { id: 'binoculars',   name: 'Бинокль',          description: 'Оптика',            weight: 0.5, cost: 200 },
+  { id: 'climb-gear',   name: 'Снаряжение для лазания', description: 'Крюки, кошки', weight: 3, cost: 25 },
+  { id: 'fishing-kit',  name: 'Рыболовный набор', description: 'Крючки, леска',     weight: 0.5, cost: 10 },
+];

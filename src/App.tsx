@@ -18,6 +18,8 @@ import { SkillsPanel } from './components/SkillsPanel';
 import { AttributesPanel } from './components/AttributesPanel';
 import { FieldEditor } from './components/FieldEditor/FieldEditor';
 import { SheetView } from './components/SheetView/SheetView';
+import { InventoryPanel } from './components/Inventory/InventoryPanel';
+import { getEncumbranceInfo } from './mechanics/encumbrance';
 import { RuleBook } from './components/RuleBook/RuleBook';
 import { Bestiary } from './components/Bestiary/Bestiary';
 import { DataManager } from './components/DataManager';
@@ -431,10 +433,22 @@ function SheetForm({
     if (hasRolled) return;
     const skill = character.skills.find((s) => s.name === skillName);
     if (!skill) return;
-    const penalty = character.wounds + character.fatigue;
+
+    // Штраф за ранения и усталость.
+    const basicPenalty = character.wounds + character.fatigue;
+
+    // Штраф за нагрузку применяется только к проверкам Ловкости и Силы
+    // (и связанным с ними навыкам).
+    const enc = getEncumbranceInfo(character);
+    const isAgiOrStr =
+      skill.attribute === 'agility' || skill.attribute === 'strength';
+    const encumbrancePenalty = isAgiOrStr ? enc.penalty : 0;
+
+    const totalPenalty = basicPenalty + encumbrancePenalty;
+
     const result = rollSkill(
       skill.die,
-      skill.modifier - penalty,
+      skill.modifier - totalPenalty,
       character.isWildCard
     );
     setLastRollSource({ kind: 'skill', name: skillName });
@@ -445,12 +459,25 @@ function SheetForm({
    * Бросок атрибута со штрафом −2 (правило SWADE, когда нет нужного навыка).
    * Дополнительно вычитаются ранения и усталость.
    */
+    /**
+   * Бросок атрибута со штрафом −2 (правило SWADE, когда нет нужного навыка).
+   * Дополнительно вычитаются ранения, усталость и (для Ловкости/Силы) нагрузка.
+   */
   function handleRollAttribute(attr: AttributeName) {
     if (hasRolled) return;
-    const penalty = character.wounds + character.fatigue;
+
+    const basicPenalty = character.wounds + character.fatigue;
+
+    // Нагрузка бьёт по Ловкости и Силе (и связанным навыкам).
+    const enc = getEncumbranceInfo(character);
+    const isAgiOrStr = attr === 'agility' || attr === 'strength';
+    const encumbrancePenalty = isAgiOrStr ? enc.penalty : 0;
+
+    const totalPenalty = basicPenalty + encumbrancePenalty;
+
     const result = rollSkill(
       character.attributes[attr],
-      -2 - penalty,
+      -2 - totalPenalty,
       character.isWildCard
     );
     setLastRollSource({ kind: 'attribute', name: attr });
@@ -466,24 +493,33 @@ function SheetForm({
 
     let die: DieType;
     let baseModifier: number;
+    let applyEncumbrance = false;
 
     if (lastRollSource.kind === 'skill') {
       const skill = character.skills.find((s) => s.name === lastRollSource.name);
       if (!skill) return;
       die = skill.die;
       baseModifier = skill.modifier;
+      applyEncumbrance =
+        skill.attribute === 'agility' || skill.attribute === 'strength';
     } else {
       die = character.attributes[lastRollSource.name];
       // Штраф −2 за отсутствие навыка сохраняется при перебросе
       baseModifier = -2;
+      applyEncumbrance =
+        lastRollSource.name === 'agility' || lastRollSource.name === 'strength';
     }
 
     onSpendBenny();
 
-    const penalty = character.wounds + character.fatigue;
+    const basicPenalty = character.wounds + character.fatigue;
+    const enc = getEncumbranceInfo(character);
+    const encumbrancePenalty = applyEncumbrance ? enc.penalty : 0;
+    const totalPenalty = basicPenalty + encumbrancePenalty;
+
     const newResult = rollSkill(
       die,
-      baseModifier - penalty,
+      baseModifier - totalPenalty,
       character.isWildCard
     );
 
@@ -685,6 +721,9 @@ function SheetForm({
       <EdgesPanel character={character} onChange={setCharacter} />
       <HindrancesPanel character={character} onChange={setCharacter} />
 
+      {/* --- Снаряжение --- */}
+      <InventoryPanel character={character} onChange={setCharacter} />
+
       {/* --- Навыки --- */}
       <SkillsPanel
         character={character}
@@ -732,7 +771,7 @@ function SheetForm({
           onNextTurn={onNextTurn}
           rollLabel={
             lastRollSource?.kind === 'attribute'
-              ? `Бросок атрибута: ${ATTRIBUTE_LABELS[lastRollSource.name]} (штраф −2)`
+              ? `Бросок атрибута: ${ATTRIBUTE_LABELS[lastRollSource.name]}`
               : 'Бросок навыка'
           }
         />
