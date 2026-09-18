@@ -32,8 +32,6 @@ import { useTheme } from './hooks/useTheme';
 import { useRole } from './hooks/useRole';
 import { ScrollText, Wrench, BookOpen, Skull, Users, FileText, Swords } from 'lucide-react';
 
-const DIE_OPTIONS: DieType[] = ['d4', 'd6', 'd8', 'd10', 'd12'];
-
 const ATTRIBUTE_LABELS: Record<AttributeName, string> = {
   agility: 'Ловкость',
   smarts: 'Смекалка',
