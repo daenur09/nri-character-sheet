@@ -18,20 +18,39 @@ import {
   updateNote,
 } from '../../db/notesDb';
 
+interface Props {
+  /**
+   * undefined — все заметки,
+   * null      — только общие,
+   * string    — только заметки указанного персонажа.
+   */
+  characterId?: string | null;
+}
+
 /**
  * Панель заметок ведущего.
  * Слева — список заметок с поиском, справа — редактор.
  * Изменения сохраняются вручную (кнопка «Сохранить», Ctrl+S, Enter в заголовке)
  * или автоматически при переключении на другую заметку.
+ *
+ * Если задан prop `characterId` — панель работает в режиме
+ * «заметки одного персонажа»: показывает только его заметки
+ * и создаёт новые с той же привязкой.
  */
-export function NotesPanel() {
-  const { notes, reload } = useNotes();
+export function NotesPanel({ characterId }: Props) {
+  const { notes, reload } = useNotes(characterId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [localContent, setLocalContent] = useState('');
   const [localTitle, setLocalTitle] = useState('');
   const [isDirty, setIsDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  // При смене фильтра (персонажа) сбрасываем выбор —
+  // прежняя заметка может не принадлежать новому контексту.
+  useEffect(() => {
+    setSelectedId(null);
+  }, [characterId]);
 
   const selected = useMemo(
     () => notes.find((n) => n.id === selectedId) ?? null,
@@ -112,7 +131,11 @@ export function NotesPanel() {
         content: localContent,
       });
     }
-    const note = await createNote('Новая заметка', '');
+    const note = await createNote(
+      'Новая заметка',
+      '',
+      typeof characterId === 'string' ? characterId : undefined
+    );
     await reload();
     setSelectedId(note.id);
   }

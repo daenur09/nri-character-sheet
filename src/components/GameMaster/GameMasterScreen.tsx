@@ -12,7 +12,7 @@ import {
   FileText,
 } from 'lucide-react';
 import type { Character } from '../../models/character';
-import { db, exportToJson, importFromJson } from '../../db/database';
+import { db, importFromJson } from '../../db/database';
 import { createNewCharacter } from '../../data/new-character';
 import { calculateDerivedStats } from '../../mechanics/derived';
 import { calculateRank } from '../../mechanics/advancement';
@@ -25,6 +25,14 @@ interface Props {
 }
 
 type Mode = 'party' | 'notes';
+
+/**
+ * Фильтр заметок в режиме «Заметки»:
+ *   undefined — все заметки,
+ *   null      — только общие (без привязки к персонажу),
+ *   string    — заметки указанного персонажа.
+ */
+type NotesFilter = string | null | undefined;
 
 export function GameMasterScreen({
   activeCharacterId,
@@ -39,6 +47,7 @@ export function GameMasterScreen({
   } | null>(null);
   const [isBatchImporting, setIsBatchImporting] = useState(false);
   const [mode, setMode] = useState<Mode>('party');
+  const [notesFilter, setNotesFilter] = useState<NotesFilter>(undefined);
 
   async function loadAll() {
     try {
@@ -101,7 +110,12 @@ export function GameMasterScreen({
   }
 
   async function handleDelete(id: string, name: string) {
-    if (!confirm(`Удалить персонажа «${name}»?\n\nЭто действие нельзя отменить.`)) return;
+    if (
+      !confirm(
+        `Удалить персонажа «${name}»?\n\nЭто действие нельзя отменить.`
+      )
+    )
+      return;
     await db.characters.delete(id);
     await loadAll();
     onRefresh();
@@ -131,7 +145,10 @@ export function GameMasterScreen({
     a.download = `party_${date}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    setMessage({ type: 'ok', text: `Экспортировано персонажей: ${characters.length}.` });
+    setMessage({
+      type: 'ok',
+      text: `Экспортировано персонажей: ${characters.length}.`,
+    });
     setTimeout(() => setMessage(null), 3000);
   }
 
@@ -175,7 +192,10 @@ export function GameMasterScreen({
         for (const c of toImport) await db.characters.put(c);
         await loadAll();
         onRefresh();
-        setMessage({ type: 'ok', text: `Импортировано персонажей: ${toImport.length}.` });
+        setMessage({
+          type: 'ok',
+          text: `Импортировано персонажей: ${toImport.length}.`,
+        });
         setTimeout(() => setMessage(null), 3000);
       } catch (err) {
         console.error(err);
@@ -188,6 +208,28 @@ export function GameMasterScreen({
     };
 
     reader.readAsText(file);
+  }
+
+  /**
+   * Значение селекта фильтра заметок.
+   */
+  const notesSelectValue: string =
+    notesFilter === undefined
+      ? '__all__'
+      : notesFilter === null
+        ? '__shared__'
+        : notesFilter;
+
+  function handleNotesFilterChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const v = e.target.value;
+    if (v === '__all__') setNotesFilter(undefined);
+    else if (v === '__shared__') setNotesFilter(null);
+    else setNotesFilter(v);
+  }
+
+  function openCharacterNotes(id: string) {
+    setNotesFilter(id);
+    setMode('notes');
   }
 
   if (isLoading) {
@@ -226,7 +268,54 @@ export function GameMasterScreen({
 
       {/* --- Содержимое --- */}
       {mode === 'notes' ? (
-        <NotesPanel />
+        <>
+          <div
+            className="panel"
+            style={{
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              marginBottom: '12px',
+              padding: '12px',
+            }}
+          >
+            <label
+              style={{
+                fontSize: '13px',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              Показать:
+            </label>
+            <select
+              value={notesSelectValue}
+              onChange={handleNotesFilterChange}
+              className="select"
+              style={{ width: 'auto', minWidth: '220px' }}
+            >
+              <option value="__all__">Все заметки</option>
+              <option value="__shared__">Общие заметки</option>
+              {characters.length > 0 && (
+                <optgroup label="По персонажу">
+                  {characters.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.profile.name || '(без имени)'}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            <div
+              className="tiny"
+              style={{ marginLeft: 'auto', fontSize: '12px' }}
+            >
+              Новые заметки создаются с текущим фильтром.
+            </div>
+          </div>
+
+          <NotesPanel characterId={notesFilter} />
+        </>
       ) : (
         <>
           {/* Тулбар партии */}
@@ -293,9 +382,13 @@ export function GameMasterScreen({
                 borderRadius: 'var(--radius-md)',
                 fontSize: '13px',
                 backgroundColor:
-                  message.type === 'ok' ? 'var(--success-soft)' : 'var(--danger-soft)',
+                  message.type === 'ok'
+                    ? 'var(--success-soft)'
+                    : 'var(--danger-soft)',
                 color:
-                  message.type === 'ok' ? 'var(--success-text)' : 'var(--danger-text)',
+                  message.type === 'ok'
+                    ? 'var(--success-text)'
+                    : 'var(--danger-text)',
               }}
             >
               {message.text}
@@ -323,6 +416,7 @@ export function GameMasterScreen({
                   character={c}
                   isActive={c.id === activeCharacterId}
                   onOpen={() => onSetActive(c.id)}
+                  onOpenNotes={() => openCharacterNotes(c.id)}
                   onDelete={() => handleDelete(c.id, c.profile.name)}
                   onWoundsChange={(d) => changeWounds(c.id, d)}
                   onFatigueChange={(d) => changeFatigue(c.id, d)}
@@ -345,6 +439,7 @@ function CharacterCard({
   character,
   isActive,
   onOpen,
+  onOpenNotes,
   onDelete,
   onWoundsChange,
   onFatigueChange,
@@ -353,6 +448,7 @@ function CharacterCard({
   character: Character;
   isActive: boolean;
   onOpen: () => void;
+  onOpenNotes: () => void;
   onDelete: () => void;
   onWoundsChange: (delta: number) => void;
   onFatigueChange: (delta: number) => void;
@@ -416,13 +512,25 @@ function CharacterCard({
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '8px',
+        }}
+      >
         <MiniStat label="Защита" value={derived.parry} />
         <MiniStat label="Стойкость" value={String(derived.toughness)} />
         <MiniStat label="Шаг" value={derived.pace} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: '8px',
+        }}
+      >
         <Tracker
           icon={<Heart size={12} />}
           label="Раны"
@@ -481,6 +589,19 @@ function CharacterCard({
           <span>Открыть лист</span>
         </button>
         <button
+          onClick={onOpenNotes}
+          className="btn"
+          title="Заметки по персонажу"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '6px 10px',
+          }}
+        >
+          <FileText size={14} />
+        </button>
+        <button
           onClick={onDelete}
           className="btn btn-danger"
           title="Удалить персонажа"
@@ -508,7 +629,10 @@ function MiniStat({ label, value }: { label: string; value: string | number }) {
         borderRadius: 'var(--radius-sm)',
       }}
     >
-      <div className="tiny" style={{ fontSize: '10px', textTransform: 'uppercase' }}>
+      <div
+        className="tiny"
+        style={{ fontSize: '10px', textTransform: 'uppercase' }}
+      >
         {label}
       </div>
       <div style={{ fontWeight: 'bold', fontSize: '16px' }}>{value}</div>
@@ -580,7 +704,14 @@ function Tracker({
         >
           −
         </button>
-        <span style={{ fontWeight: 'bold', fontSize: '14px', minWidth: '12px', textAlign: 'center' }}>
+        <span
+          style={{
+            fontWeight: 'bold',
+            fontSize: '14px',
+            minWidth: '12px',
+            textAlign: 'center',
+          }}
+        >
           {value}
         </span>
         <button

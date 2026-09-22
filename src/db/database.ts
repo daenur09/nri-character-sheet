@@ -62,13 +62,26 @@ export class CharacterDatabase extends Dexie {
       customMonsters: 'id, name, createdAt',
       notes: 'id, title, updatedAt, isPinned',
     });
+
+    // Версия 6 — привязка заметок к персонажу (индекс characterId).
+    // Старые заметки без поля characterId попадают в «общие».
+    this.version(6).stores({
+      characters: 'id, name',
+      fieldMaps: 'id, name',
+      customEdges: 'id, name, createdAt',
+      customHindrances: 'id, name, createdAt',
+      customSkills: 'id, name, createdAt',
+      customPowers: 'id, name, createdAt',
+      customMonsters: 'id, name, createdAt',
+      notes: 'id, title, updatedAt, isPinned, characterId',
+    });
   }
 }
 
 export const db = new CharacterDatabase();
 
 // ============================================================
-// Экспорт и импорт персонажа (без изменений)
+// Экспорт и импорт персонажа
 // ============================================================
 
 export interface ExportBundle {

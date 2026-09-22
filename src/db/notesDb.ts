@@ -13,11 +13,17 @@ function generateNoteId(): string {
 }
 
 /**
- * Создаёт новую пустую заметку и сохраняет её в БД.
+ * Создаёт новую заметку и сохраняет её в БД.
+ *
+ * @param title       Заголовок.
+ * @param content     Содержимое.
+ * @param characterId Если задано — заметка привязывается к персонажу.
+ *                    Если не передано / пустая строка — заметка «общая».
  */
 export async function createNote(
   title = 'Новая заметка',
-  content = ''
+  content = '',
+  characterId?: string
 ): Promise<Note> {
   const now = new Date().toISOString();
   const note: Note = {
@@ -27,6 +33,7 @@ export async function createNote(
     createdAt: now,
     updatedAt: now,
     isPinned: false,
+    ...(characterId ? { characterId } : {}),
   };
   await db.notes.add(note);
   return note;
@@ -54,12 +61,35 @@ export async function deleteNote(id: string): Promise<void> {
 }
 
 /**
- * Возвращает все заметки, отсортированные:
- * сначала закреплённые, потом — по времени последнего изменения.
+ * Список заметок с опциональной фильтрацией.
+ *
+ *  - Аргумент не передан (или без поля characterId):
+ *      возвращаются ВСЕ заметки — общие и персональные.
+ *  - options.characterId === null:
+ *      только общие заметки (без привязки к персонажу).
+ *  - options.characterId === '<id>':
+ *      только заметки указанного персонажа.
+ *
+ *  Результат всегда отсортирован: сначала закреплённые,
+ *  затем — по времени последнего изменения (свежие вверху).
  */
-export async function listNotes(): Promise<Note[]> {
+export async function listNotes(options?: {
+  characterId?: string | null;
+}): Promise<Note[]> {
   const all = await db.notes.toArray();
-  return all.sort((a, b) => {
+  let filtered = all;
+
+  if (options && 'characterId' in options) {
+    const target = options.characterId;
+    if (target === null) {
+      filtered = all.filter((n) => !n.characterId);
+    } else if (typeof target === 'string') {
+      filtered = all.filter((n) => n.characterId === target);
+    }
+    // target === undefined — без фильтра.
+  }
+
+  return filtered.sort((a, b) => {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
     return b.updatedAt.localeCompare(a.updatedAt);
   });

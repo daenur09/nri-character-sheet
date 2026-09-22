@@ -37,6 +37,7 @@ export interface EncumbranceInfo {
   comfortable: number;
   maxLoad: number;
   status: EncumbranceStatus;
+/** Величина штрафа как положительное число: 0, 1, 2, 4 */
   penalty: number;
   label: string;
 }
